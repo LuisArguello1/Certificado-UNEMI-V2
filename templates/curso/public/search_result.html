@@ -1,0 +1,192 @@
+{% extends 'layouts/base_public.html' %}
+{% load static %}
+
+{% block title %}Resultado de Búsqueda{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 flex items-center py-4 px-3 sm:px-6">
+    <div class="w-full max-w-6xl mx-auto">
+        
+        <!-- Header Compacto -->
+        <div class="bg-white border-b-2 border-blue-700 mb-3 px-4 py-2 rounded-t-lg shadow-sm">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-certificate text-blue-700 text-lg"></i>
+                    <h2 class="text-lg font-bold text-gray-800">Certificado Verificado</h2>
+                </div>
+                <span class="px-2 py-1 text-xs font-semibold rounded bg-green-500 text-white">
+                    VÁLIDO
+                </span>
+            </div>
+        </div>
+
+        <!-- Contenedor Principal Grid -->
+        <div class="bg-white shadow-lg rounded-b-lg overflow-hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
+                
+                <!-- Columna Izquierda: Datos -->
+                <div class="p-4 space-y-3">
+                    
+                    <!-- Datos del Estudiante -->
+                    <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-user-graduate text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Estudiante</h4>
+                                <p class="text-sm font-bold text-gray-900 truncate">{{ estudiante.nombre_completo }}</p>
+                                <p class="text-xs text-gray-600 mt-0.5">C.I. {{ estudiante.cedula }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos del Curso -->
+                    <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-book text-blue-600 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-xs font-semibold text-gray-500 uppercase mb-1">Actividad Académica</h4>
+                                <p class="text-sm font-semibold text-gray-800 line-clamp-2">{{ curso.nombre }}</p>
+                                <p class="text-xs text-gray-600 mt-1 line-clamp-2">{{ curso.descripcion|truncatewords:15 }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="pt-2 space-y-2">
+                        {% if certificado and certificado.archivo_generado %}
+                            <a href="{% url 'curso:certificate_download' certificado.pk %}" 
+                               class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm">
+                                <i class="fas fa-download mr-2 text-xs"></i> Descargar Certificado
+                            </a>
+                        {% else %}
+                           <div class="bg-yellow-50 border border-yellow-300 rounded p-3 flex gap-2">
+                               <i class="fas fa-clock text-yellow-600 text-sm mt-0.5"></i>
+                               <p class="text-xs text-yellow-800 leading-tight">
+                                   Certificado en proceso de generación. Intente más tarde.
+                               </p>
+                           </div>
+                        {% endif %}
+                        
+                        <a href="{% url 'curso:public_portal' %}" 
+                           class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-colors">
+                            <i class="fas fa-search mr-2 text-xs"></i> Nueva Búsqueda
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Previsualización PDF -->
+                {% if certificado and certificado.archivo_generado %}
+                <div class="p-4 bg-gray-50 flex flex-col">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                        <i class="fas fa-file-pdf text-red-500"></i> Vista Previa
+                    </h4>
+                    
+                    <!-- Contenedor del Visor -->
+                    <div id="pdf-container" class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden relative flex-1 flex items-center justify-center" style="min-height: 400px; max-height: calc(100vh - 200px);">
+                        
+                        <!-- Loading Spinner -->
+                        <div id="pdf-loading" class="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+                            <div class="text-center">
+                                <i class="fas fa-circle-notch fa-spin text-blue-500 text-2xl mb-2"></i>
+                                <p class="text-gray-500 text-xs">Cargando...</p>
+                            </div>
+                        </div>
+
+                        <!-- Canvas para renderizar el PDF -->
+                        <canvas id="pdf-render" class="max-w-full h-auto"></canvas>
+                        
+                        <!-- Botón flotante mobile -->
+                        <div class="absolute bottom-2 right-2 lg:hidden">
+                            <a href="{{ certificado.archivo_generado.url }}" download class="bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center" style="width: 40px; height: 40px;">
+                                <i class="fas fa-download text-sm"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PDF.js Library -->
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+                <script>
+                    // Configurar worker
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    const url = '{{ certificado.archivo_generado.url }}';
+                    const loadingTask = pdfjsLib.getDocument(url);
+                    
+                    loadingTask.promise.then(pdf => {
+                        pdf.getPage(1).then(page => {
+                            const canvas = document.getElementById('pdf-render');
+                            const ctx = canvas.getContext('2d');
+                            const loading = document.getElementById('pdf-loading');
+                            const container = document.getElementById('pdf-container');
+                            
+                            // --- RESPONSIVE SCALING ---
+                            // Obtener ancho del contenedor (o window si es muy pequeño)
+                            const containerWidth = container.clientWidth - 32; // -padding
+                            const unscaledViewport = page.getViewport({scale: 1});
+                            
+                            // Calcular escala para que quepa en el ancho
+                            let scale = containerWidth / unscaledViewport.width;
+                            
+                            // Limite de calidad (no escalar infinito en desktop)
+                            if (scale > 1.5) scale = 1.5; 
+                            
+                            const viewport = page.getViewport({scale: scale});
+
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+
+                            const renderContext = {
+                                canvasContext: ctx,
+                                viewport: viewport
+                            };
+                            
+                            const renderTask = page.render(renderContext);
+                            renderTask.promise.then(() => {
+                                loading.classList.add('hidden');
+                                container.style.minHeight = 'auto'; // Ajustar altura
+                            });
+                        });
+                    }, reason => {
+                        console.error('Error cargando PDF:', reason);
+                        document.getElementById('pdf-loading').innerHTML = `
+                            <div class="text-red-500 px-4 text-center py-10">
+                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                                <p class="mb-2 text-sm">Vista previa no disponible.</p>
+                                <a href="${url}" class="text-blue-600 underline text-xs font-bold">Descargar PDF</a>
+                            </div>
+                        `;
+                    });
+                    
+                    // Recargar al cambiar tamaño de ventana (opcional, simple debounce)
+                    let resizeTimeout;
+                    window.addEventListener('resize', () => {
+                        clearTimeout(resizeTimeout);
+                        resizeTimeout = setTimeout(() => {
+                            // Podríamos reimplementar renderizado aquí si fuera crítico
+                        }, 200);
+                    });
+                </script>
+                {% endif %}
+            </div>
+            
+            <!-- Footer -->
+            <div class="bg-gray-100 border-t border-gray-200 px-4 py-2">
+                 <p class="text-xs text-center text-gray-500">
+                     <i class="fas fa-university text-gray-400 mr-1"></i>
+                     Universidad Estatal de Milagro - Documento Oficial
+                 </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}

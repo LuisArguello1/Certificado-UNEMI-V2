@@ -1,0 +1,286 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Previsualización{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
+                 <a href="{% url 'correo:create' %}" class="text-gray-400 hover:text-gray-600 mr-3 transition-colors text-xl">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                Previsualización y Envío
+            </h1>
+            <p class="text-sm text-gray-500 mt-1 ml-8">Confirme el contenido y los destinatarios antes de procesar.</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <span class="inline-flex items-center px-3 py-1 rounded bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
+                <i class="fas fa-clock mr-2"></i> Paso Final
+            </span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        
+        <!-- Columna Izquierda: Preview Visual -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Visualización del Correo (Preview Real) -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                        <i class="fas fa-desktop mr-2"></i> Simulación del Correo
+                    </h3>
+                </div>
+                
+                <div class="p-4 bg-gray-100 flex justify-center">
+                    <!-- Email Container Simulator -->
+                    <div class="w-full max-w-[600px] shadow-lg">
+                        <div style="background-color: #f4f7fa; font-family: 'Segoe UI', sans-serif;">
+                            
+                            <!-- Email Header -->
+                            <div style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 30px 0; text-align: center;">
+                                <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 600;">UNEMI</h1>
+                                <p style="color: #e0e7ff; font-size: 13px; margin: 5px 0 0 0;">Universidad Estatal de Milagro</p>
+                            </div>
+
+                            <!-- Email Body -->
+                            <div style="background-color: #ffffff; padding: 30px;">
+                                <h2 style="color: #111827; font-size: 18px; font-weight: 600; margin: 0 0 15px 0;">¡Hola, [Nombre del estudiante]!</h2>
+
+                                <div style="color: #374151; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+                                    {% if campaign.message %}
+                                        {{ campaign.message|safe }}
+                                    {% else %}
+                                        <p class="italic text-gray-400">Sin mensaje personalizado.</p>
+                                    {% endif %}
+                                </div>
+
+                                <div style="margin: 30px 0; text-align: center;">
+                                    <span style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 4px;">
+                                        Descargar Certificado &rarr;
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Email Footer -->
+                            <div style="background-color: #f9fafb; padding: 20px 30px; border-top: 1px solid #e5e7eb;">
+                                <p style="color: #6b7280; font-size: 12px; margin: 0;">Saludos cordiales,<br>Universidad Estatal de Milagro</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Summary & Actions -->
+        <div class="space-y-6">
+            
+            <!-- Resumen -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Resumen de Campaña</h3>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 uppercase">Nombre</label>
+                        <p class="text-sm font-medium text-gray-900 mt-1">{{ campaign_data.name }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 uppercase">Asunto</label>
+                        <p class="text-sm text-gray-900 mt-1">{{ campaign_data.subject }}</p>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-lg">
+                            <span class="block text-xl font-bold text-blue-700">{{ total_count }}</span>
+                            <span class="text-xs text-blue-600 font-medium">Destinatarios</span>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <span class="block text-xl font-bold text-green-700">{{ total_count }}</span>
+                            <span class="text-xs text-green-600 font-medium">Correos Válidos</span>
+                        </div>
+                    </div>
+                    
+                    {% if warnings %}
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mt-4">
+                        <div class="flex">
+                            <i class="fas fa-exclamation-triangle text-yellow-400 mt-0.5 mr-2"></i>
+                            <div>
+                                <h4 class="text-xs font-bold text-yellow-700">Advertencias ({{ warnings|length }})</h4>
+                                <ul class="mt-1 text-xs text-yellow-600 list-disc list-inside">
+                                    {% for warning in warnings|slice:":3" %}
+                                    <li class="truncate">{{ warning }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4">
+                 <!-- Botón para abrir modal de confirmación -->
+                 <button type="button" onclick="openConfirmModal()" class="w-full flex justify-center items-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition-all mb-3">
+                    <i class="fas fa-paper-plane mr-2"></i> Confirmar y Enviar
+                </button>
+                
+                <div class="mt-3 text-center">
+                    <a href="{% url 'correo:edit' campaign.pk %}" class="text-sm text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-pen mr-1"></i> Editar datos
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Tabla de Destinatarios (Muestra) -->
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden mb-12">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center">
+                <i class="fas fa-list mr-2 text-gray-400"></i> Listado de Destinatarios
+            </h3>
+            <button onclick="openRecipientsModal()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium bg-white border border-gray-300 px-3 py-1 rounded shadow-sm hover:bg-gray-50 transition">
+                <i class="fas fa-expand mr-1"></i> Ver Todos
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
+                        <th scope="col" class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Nombre Completo</th>
+                        <th scope="col" class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Correo Electrónico</th>
+                        <th scope="col" class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Verificación</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for recipient in preview_recipients %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-3 whitespace-nowrap text-gray-400 text-xs">{{ forloop.counter }}</td>
+                        <td class="px-6 py-3 whitespace-nowrap font-medium text-gray-900">{{ recipient.full_name }}</td>
+                        <td class="px-6 py-3 whitespace-nowrap text-gray-500">{{ recipient.email }}</td>
+                        <td class="px-6 py-3 whitespace-nowrap">
+                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-check mr-1 text-green-500"></i> Listo
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                     {% if total_count > 10 %}
+                    <tr>
+                         <td colspan="4" class="px-6 py-3 text-center text-xs text-gray-500 bg-gray-50 italic">
+                            Mostrando 10 de {{ total_count }} registros. Haga clic en "Ver Todos" para ver la lista completa.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- DATA STORE for recipients (JSON) -->
+<script id="recipients-data" type="application/json">
+    {{ all_recipients_json|safe }}
+</script>
+
+<!-- MODAL: Lista de Todos los Destinatarios -->
+<div id="recipientsModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeRecipientsModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                        Todos los Destinatarios ({{ total_count }})
+                    </h3>
+                    <button type="button" onclick="closeRecipientsModal()" class="text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- Table Container -->
+                <div class="overflow-x-auto min-h-[300px] max-h-[60vh] border border-gray-200 rounded-md">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">#</th>
+                                <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Correo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-recipients-body" class="bg-white divide-y divide-gray-200">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación JS -->
+                <div class="flex items-center justify-between mt-4">
+                    <button onclick="prevPage()" id="btnPrev" class="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+                    <span id="pageInfo" class="text-sm text-gray-600">Página 1</span>
+                    <button onclick="nextPage()" id="btnNext" class="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Confirmación de Envío -->
+<div id="confirmModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeConfirmModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        
+        <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+            <div class="sm:flex sm:items-start">
+                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <i class="fas fa-paper-plane text-green-600"></i>
+                </div>
+                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        Confirmar Envío Masivo
+                    </h3>
+                    <div class="mt-2">
+                         <p class="text-sm text-gray-500">
+                            Estás a punto de enviar la campaña <strong>"{{ campaign_data.name }}"</strong>.
+                        </p>
+                        <div class="bg-gray-50 p-3 rounded mt-3 mb-3 border border-gray-200">
+                             <p class="text-sm text-gray-700"><strong>Destinatarios:</strong> {{ total_count }}</p>
+                             <p class="text-xs text-gray-500 mt-1">Este proceso se ejecutará en segundo plano.</p>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            ¿Estás seguro de que deseas continuar? Esta acción no se puede deshacer.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <form id="sendCampaignForm" method="post" action="{% url 'correo:send' campaign.pk %}" class="w-full sm:w-auto sm:ml-3" onsubmit="handleSendSubmit()">
+                    {% csrf_token %}
+                    <button id="btnConfirmSend" type="submit" class="w-full inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm">
+                        Sí, Enviar Ahora
+                    </button>
+                </form>
+                <button type="button" onclick="closeConfirmModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/pages/campaign-preview.js' %}"></script>
+{% endblock %}

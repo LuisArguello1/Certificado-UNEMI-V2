@@ -1,0 +1,35 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Dashboard - Certicate{% endblock %}
+
+{% block content %}
+<div class="px-5 py-6 max-w-[1600px] mx-auto space-y-6 animate-fade-in">
+
+    <!-- Top Bar: Status & Quick Actions -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+        
+    </div>
+</div>
+
+<style>
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    .animate-shimmer {
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        animation: shimmer 2s infinite;
+    }
+    .animate-spin-once {
+        animation: spin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+
+{% endblock %}
