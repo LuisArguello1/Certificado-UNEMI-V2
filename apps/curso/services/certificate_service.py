@@ -13,7 +13,7 @@ from reportlab.lib.colors import HexColor
 class CertificateService:
     """
     Servicio para generar certificados en PDF de alta fidelidad.
-    Maneja arquitectura multi-bloque dinámica con reemplazo de variables.
+    Maneja arquitectura multi-bloque dinámica con reemplazo de variables garantizado.
     """
     
     @staticmethod
@@ -39,7 +39,9 @@ class CertificateService:
             certificado.codigo_verificacion = str(uuid.uuid4())[:13].upper().replace('-', '')
             certificado.save(update_fields=['codigo_verificacion'])
 
-        # Mapeo de valores dinámicos para reemplazo
+        # Mapeo de valores dinámicos CORE para reemplazo forzado
+        # Esto asegura que incluso si el usuario editó el texto en el diseñador,
+        # los valores del alumno actual se inyecten correctamente.
         replacements = {
             'NOMBRE DEL ESTUDIANTE': estudiante.nombre_completo.strip().upper(),
             'NOMBRE DEL CURSO': curso.nombre.strip().upper(),
@@ -48,6 +50,16 @@ class CertificateService:
             'FECHA_INICIO': CertificateService.format_date_es(curso.fecha_inicio),
             'FECHA_FIN': CertificateService.format_date_es(curso.fecha_fin),
             'FECHA_EMISION': CertificateService.format_date_es(certificado.fecha_generacion),
+        }
+
+        # Valores por defecto para bloques si no tienen placeholder
+        # Esto previene el error donde el diseñador guarda "ARELIS RUIZ" como texto estático
+        block_type_defaults = {
+            'student': '[NOMBRE DEL ESTUDIANTE]',
+            'course': '"[NOMBRE DEL CURSO]"',
+            'responsible': 'bajo la responsabilidad de [RESPONSABLE].',
+            'dates': 'con una duración desde [FECHA_INICIO] hasta [FECHA_FIN],',
+            'footer': 'En constancia se expide el presente el [FECHA_EMISION].'
         }
 
         buffer = io.BytesIO()
@@ -61,9 +73,14 @@ class CertificateService:
         for block_id, block_conf in config.items():
             if not isinstance(block_conf, dict): continue
             
-            # Obtener texto (priorizar el override del diseñador)
+            block_type = block_conf.get('type', '')
             raw_text = block_conf.get('text_override', "")
-            if not raw_text: continue
+            
+            # PROTECCIÓN: Si es un bloque de tipo 'student' y no tiene el placeholder ni el nombre real del alumno,
+            # pero tiene el nombre de ejemplo que se guardó en el diseñador, lo forzamos al placeholder.
+            # O simplemente aplicamos el default del tipo si el texto parece "sucio".
+            if not raw_text or (block_type in block_type_defaults and 'ARELIS RUIZ' in raw_text.upper()):
+                raw_text = block_type_defaults.get(block_type, raw_text)
 
             # Procesar REEMPLAZOS (soporta {VAR} y [VAR])
             processed_text = raw_text
@@ -95,13 +112,12 @@ class CertificateService:
                 p.setFont(font_variant, font_size)
                 p.setFillColor(HexColor(color_hex))
                 
-                # Dibujar centrado horizontalmente en el pivot
                 p.drawCentredString(x_pos, y_pos, processed_text)
 
             except Exception as e:
                 print(f"Error renderizando bloque {block_id}: {e}")
 
-        # QR Proporcional
+        # QR
         try:
             ver_url = f"https://certificados.unemi.edu.ec/verificar/{certificado.codigo_verificacion}/"
             qr = qrcode.QRCode(version=1, box_size=10, border=1)
@@ -114,10 +130,6 @@ class CertificateService:
             
             qr_size = img_w * 0.08 
             p.drawImage(ImageReader(qr_buf), img_w - qr_size - (img_w*0.05), (img_h*0.05), width=qr_size, height=qr_size)
-            
-            p.setFillColorRGB(0.3, 0.3, 0.3)
-            p.setFont("Helvetica", 8 * (img_w / 1000))
-            p.drawRightString(img_w - (img_w*0.05), (img_h*0.04), f"ID V: {certificado.codigo_verificacion}")
         except Exception as e:
             print(f"Error QR: {e}")
 

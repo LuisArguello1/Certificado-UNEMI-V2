@@ -162,10 +162,19 @@
 
     <!-- PANEL CENTRAL: CANVAS -->
     <main class="canvas-container">
-        <div id="certificate-area">
-            <img id="certificate-bg" src="{{ object.plantilla_certificado.archivo.url }}" alt="Template">
-            <!-- Bloques se inyectan aquí -->
-        </div>
+                <div id="certificate-area" class="bg-white">
+                    <img id="certificate-bg" src="{{ object.plantilla_certificado.archivo.url }}" alt="Template">
+                    
+                    <!-- Bloques Individuales Draggables con Datos Reales para Preview -->
+                    <div id="block-title" class="draggable-element block-title" data-title="Título Principal">CERTIFICADO DE PARTICIPACIÓN</div>
+                    <div id="block-intro" class="draggable-element block-text" data-title="Introducción">Por medio de la presente se certifica que:</div>
+                    <div id="block-student" class="draggable-element block-name" data-title="Nombre del Estudiante">{{ preview_student.nombre_completo|default:"ARELIS RUIZ SEGOVIA"|upper }}</div>
+                    <div id="block-course-intro" class="draggable-element block-text" data-title="Texto del Curso">ha participado en el curso:</div>
+                    <div id="block-course-name" class="draggable-element block-course" data-title="Nombre del Curso">"{{ object.nombre|upper }}"</div>
+                    <div id="block-details" class="draggable-element block-text" data-title="Fechas y Periodo">con una duración desde {{ object.fecha_inicio|date:"d/m/Y" }} hasta {{ object.fecha_fin|date:"d/m/Y" }},</div>
+                    <div id="block-responsible" class="draggable-element block-text" data-title="Responsable">bajo la responsabilidad de {{ object.responsable }}.</div>
+                    <div id="block-emision" class="draggable-element block-text" data-title="Fecha Emisión" style="font-style: italic; opacity: 0.8;">En constancia se expide el presente el {% now "j \d\e F \d\e Y" %}.</div>
+                </div>
     </main>
 
     <!-- PANEL DERECHO: LISTA DE BLOQUES -->
@@ -197,12 +206,12 @@
     const DEFAULT_POSITIONS = {
         title: { x_pct: 50, y_pct: 15, fontSize: 48, color: '#2E7D32', text: 'CERTIFICADO DE PARTICIPACIÓN', bold: true },
         subtitle: { x_pct: 50, y_pct: 22, fontSize: 20, color: '#666666', text: 'Por medio de la presente se certifica que:' },
-        student: { x_pct: 50, y_pct: 35, fontSize: 42, color: '#2E7D32', text: 'ARELIS RUIZ SEGOVIA', bold: true },
+        student: { x_pct: 50, y_pct: 35, fontSize: 42, color: '#2E7D32', text: '{{ preview_student.nombre_completo|default:"ARELIS RUIZ SEGOVIA"|upper }}', bold: true },
         course_intro: { x_pct: 50, y_pct: 45, fontSize: 18, color: '#666666', text: 'ha participado en el curso:' },
         course: { x_pct: 50, y_pct: 52, fontSize: 32, color: '#1a237e', text: '"{{ object.nombre|upper }}"', bold: true },
-        dates: { x_pct: 50, y_pct: 62, fontSize: 18, color: '#666666', text: 'con una duración desde 01/01/2026 hasta 31/01/2026,' },
+        dates: { x_pct: 50, y_pct: 62, fontSize: 18, color: '#666666', text: 'con una duración desde {{ object.fecha_inicio|date:"d/m/Y" }} hasta {{ object.fecha_fin|date:"d/m/Y" }},' },
         responsible: { x_pct: 50, y_pct: 68, fontSize: 18, color: '#666666', text: 'bajo la responsabilidad de {{ object.responsable }}.' },
-        footer: { x_pct: 50, y_pct: 78, fontSize: 16, color: '#888888', text: 'En constancia se expide el presente el 24 de enero de 2026.' }
+        footer: { x_pct: 50, y_pct: 78, fontSize: 16, color: '#888888', text: 'En constancia se expide el presente el {% now "j \d\e F \d\e Y" %}.' }
     };
 
     let textBlocks = [];
@@ -221,6 +230,17 @@
             } catch (e) { console.error("Error cargando config:", e); }
         }
     });
+
+    const PLACEHOLDER_MAP = {
+        'student': '[NOMBRE DEL ESTUDIANTE]',
+        'course': '"[NOMBRE DEL CURSO]"',
+        'responsible': 'bajo la responsabilidad de [RESPONSABLE].',
+        'dates': 'con una duración desde [FECHA_INICIO] hasta [FECHA_FIN],',
+        'footer': 'En constancia se expide el presente el [FECHA_EMISION].',
+        'title': 'CERTIFICADO DE PARTICIPACIÓN',
+        'subtitle': 'Por medio de la presente se certifica que:',
+        'course_intro': 'ha participado en el curso:'
+    };
 
     function addBlock(type) {
         const id = 'block_' + Date.now();
@@ -415,27 +435,30 @@
         document.addEventListener('mouseup', () => { isDragging = false; });
     }
 
-    // --- GUARDAR ---
-    document.getElementById('btn-save').onclick = () => {
-        const config = {};
-        textBlocks.forEach(b => {
-            config[b.id] = {
-                x: b.x_pct,
-                y: b.y_pct,
-                x_web: b.x_pct,
-                y_web: b.y_pct,
-                font_size: b.fontSize,
-                color: b.color,
-                bold: b.bold,
-                italic: b.italic,
-                type: b.type,
-                text_override: b.text,
-                container_w: canvas.offsetWidth,
-                container_h: canvas.offsetHeight
-            };
-        });
-        document.getElementById('configuracion_json').value = JSON.stringify(config);
-        document.getElementById('hidden-form').submit();
-    };
+        document.getElementById('btn-save').onclick = () => {
+            const config = {};
+            textBlocks.forEach(b => {
+                // Si el bloque es de un tipo conocido, forzamos el placeholder en el guardado
+                // Esto asegura que el servidor reemplace los datos reales del alumno
+                const textToSave = PLACEHOLDER_MAP[b.type] || b.text;
+
+                config[b.id] = {
+                    x: b.x_pct,
+                    y: b.y_pct,
+                    x_web: b.x_pct,
+                    y_web: b.y_pct,
+                    font_size: b.fontSize,
+                    color: b.color,
+                    bold: b.bold,
+                    italic: b.italic,
+                    type: b.type,
+                    text_override: textToSave, // GUARDAMOS EL PLACEHOLDER
+                    container_w: canvas.offsetWidth,
+                    container_h: canvas.offsetHeight
+                };
+            });
+            document.getElementById('configuracion_json').value = JSON.stringify(config);
+            document.getElementById('hidden-form').submit();
+        };
 </script>
 {% endblock %}
