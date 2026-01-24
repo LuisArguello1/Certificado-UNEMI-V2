@@ -27,24 +27,17 @@ class Curso(models.Model):
     """
     Modelo para gestionar los cursos.
     """
-    ESTADO_CHOICES = [
-        ('disponible', 'Disponible'),
-        ('no_disponible', 'No Disponible'),
-    ]
-
     nombre = models.CharField(max_length=200, verbose_name='Nombre del curso')
-    descripcion = models.TextField(verbose_name='Descripción')
-    estado = models.CharField(
-        max_length=20, 
-        choices=ESTADO_CHOICES, 
-        default='disponible', 
-        verbose_name='Estado'
-    )
+    descripcion = models.TextField(verbose_name='Descripción', blank= True, null= True)
+    responsable = models.CharField(max_length=200, verbose_name='Responsable del curso', blank=False, null=False)
+    fecha_inicio = models.DateField(verbose_name='Fecha de inicio', blank=True, null=True)
+    fecha_fin = models.DateField(verbose_name='Fecha de fin', blank=True, null=True)
+    
     archivo_estudiantes = models.FileField(
         upload_to='cursos/estudiantes/',
         validators=[FileExtensionValidator(allowed_extensions=['xlsx', 'xls'])],
         verbose_name='Archivo de Estudiantes (Excel)',
-        help_text='Subir archivo con columnas: Nombres y Apellidos completos, Cedula, Correo electronico'
+        help_text='Subir archivo con columnas: Nombres, Cedula, Correo'
     )
     plantilla_certificado = models.ForeignKey(
         PlantillaCertificado,
@@ -52,6 +45,18 @@ class Curso(models.Model):
         null=True,
         blank=True,
         verbose_name='Plantilla de Certificado por defecto'
+    )
+    texto_certificado = models.TextField(
+        null=True, 
+        blank=True, 
+        verbose_name='Texto del Certificado',
+        help_text='Contenido del certificado. Use {NOMBRE_ESTUDIANTE}, {CEDULA}, {CURSO}, {FECHA_INICIO}, {FECHA_FIN}, {RESPONSABLE} como variables.'
+    )
+    configuracion_certificado = models.JSONField(
+        null=True, 
+        blank=True, 
+        verbose_name='Configuración del Certificado',
+        help_text='Almacena posiciones, fuentes y texto dinámico.'
     )
     fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     actualizado_en = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
@@ -83,7 +88,6 @@ class Estudiante(models.Model):
         verbose_name = 'Estudiante'
         verbose_name_plural = 'Estudiantes'
         ordering = ['nombre_completo']
-        # Optimización: Restricción única (funciona como índice compuesto) + Índices explícitos
         constraints = [
             models.UniqueConstraint(fields=['curso', 'cedula'], name='unique_estudiante_curso')
         ]

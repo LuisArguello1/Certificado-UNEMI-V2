@@ -1,0 +1,38 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Eliminar Estudiante{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto py-12">
+    <div class="bg-white shadow-lg rounded-2xl border border-red-100 overflow-hidden">
+        <div class="bg-red-50 px-8 py-6 border-b border-red-100 flex items-center">
+            <div class="bg-red-100 p-3 rounded-full mr-4">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-red-900">¿Eliminar Estudiante?</h1>
+                <p class="text-sm text-red-700">Esta acción no se puede deshacer.</p>
+            </div>
+        </div>
+
+        <div class="p-8">
+            <p class="text-gray-600 mb-6">
+                Está a punto de eliminar a <strong class="text-gray-900">{{ object.nombre_completo }}</strong> del curso 
+                <strong class="text-gray-900">{{ object.curso.nombre }}</strong>. 
+                También se eliminarán sus certificados generados.
+            </p>
+
+            <form method="post" class="flex flex-col sm:flex-row gap-3">
+                {% csrf_token %}
+                <button type="submit" class="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition shadow-lg shadow-red-100">
+                    Sí, eliminar estudiante
+                </button>
+                <a href="{% url 'curso:estudiantes' object.curso.pk %}" class="flex-1 px-6 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 text-center transition">
+                    Cancelar
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

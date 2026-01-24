@@ -1,0 +1,63 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Verificación de Certificado{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-12">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <!-- Header -->
+        <div class="bg-green-600 px-8 py-10 text-center text-white">
+            <div class="inline-flex items-center justify-center h-20 w-20 bg-white/20 rounded-full mb-4">
+                <i class="fas fa-check-circle text-4xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold">Certificado Auténtico</h1>
+            <p class="text-green-100 mt-2">Este documento ha sido verificado por el Sistema de Gestión de Certificados UNEMI.</p>
+        </div>
+
+        <!-- Details -->
+        <div class="p-8 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Cursante</h3>
+                    <p class="text-lg font-bold text-gray-900">{{ estudiante.nombre_completo }}</p>
+                    <p class="text-sm text-gray-500">CI: {{ estudiante.cedula }}</p>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Evento Académico</h3>
+                    <p class="text-lg font-bold text-indigo-700">{{ curso.nombre }}</p>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Fecha de Emisión</h3>
+                    <p class="text-sm font-medium text-gray-700">{{ certificado.fecha_generacion|date:"d \d\e F \d\e Y" }}</p>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Código de Registro</h3>
+                    <p class="text-sm font-mono font-bold text-gray-900 bg-gray-50 px-2 py-1 rounded inline-block">
+                        {{ certificado.codigo_verificacion }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-gray-100">
+                <a href="{{ certificado.archivo_generado.url }}" target="_blank"
+                   class="inline-flex items-center justify-center w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-100">
+                    <i class="fas fa-download mr-2"></i> Ver Documento Original (PDF)
+                </a>
+            </div>
+            
+            <div class="text-center">
+                <p class="text-[11px] text-gray-400 italic">
+                    Este sistema garantiza que el certificado emitido corresponde a los registros académicos institucionales.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 text-center">
+        <a href="{% url 'curso:public_portal' %}" class="text-gray-500 hover:text-indigo-600 text-sm font-medium transition">
+            <i class="fas fa-arrow-left mr-2"></i> Volver al Portal de Certificados
+        </a>
+    </div>
+</div>
+{% endblock %}

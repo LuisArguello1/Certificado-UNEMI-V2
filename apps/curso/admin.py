@@ -3,9 +3,9 @@ from .models import Curso, Estudiante, PlantillaCertificado, Certificado
 
 @admin.register(Curso)
 class CursoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'estado', 'fecha_creacion', 'actualizado_en')
-    list_filter = ('estado', 'fecha_creacion')
-    search_fields = ('nombre', 'descripcion')
+    list_display = ('nombre', 'responsable', 'fecha_inicio', 'fecha_fin', 'fecha_creacion')
+    list_filter = ('fecha_creacion', 'fecha_inicio')
+    search_fields = ('nombre', 'descripcion', 'responsable')
     date_hierarchy = 'fecha_creacion'
 
 @admin.register(Estudiante)

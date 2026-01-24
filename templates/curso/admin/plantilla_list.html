@@ -1,0 +1,71 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Plantillas de Certificados{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div
+        class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
+                <i class="fas fa-certificate text-gray-400 mr-2 text-xl"></i> Plantillas de Certificados
+            </h1>
+            <p class="text-sm text-gray-500 mt-1 ml-1">Gestiona los fondos y formatos base para los certificados.</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{% url 'curso:plantilla_create' %}"
+                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                <i class="fas fa-upload mr-2"></i> Subir Plantilla
+            </a>
+        </div>
+    </div>
+
+    {% if plantillas %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for plantilla in plantillas %}
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+            <div class="aspect-video bg-gray-100 relative group overflow-hidden">
+                {% if plantilla.archivo.url|lower|slice:"-4:" == ".pdf" %}
+                <div class="flex items-center justify-center h-full text-red-500 flex-col">
+                    <i class="fas fa-file-pdf text-5xl mb-2"></i>
+                    <span class="text-xs font-medium uppercase">PDF Base</span>
+                </div>
+                {% else %}
+                <img src="{{ plantilla.archivo.url }}" alt="{{ plantilla.nombre }}" class="w-full h-full object-cover">
+                {% endif %}
+                <div
+                    class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                    <a href="{% url 'curso:plantilla_edit' plantilla.pk %}"
+                        class="bg-white/90 p-2 rounded-full text-indigo-600 hover:bg-white transition-colors"><i
+                            class="fas fa-edit"></i></a>
+                    <a href="{% url 'curso:plantilla_delete' plantilla.pk %}"
+                        class="bg-white/90 p-2 rounded-full text-red-600 hover:bg-white transition-colors"><i
+                            class="fas fa-trash"></i></a>
+                </div>
+            </div>
+            <div class="p-4 flex-1">
+                <h3 class="text-sm font-bold text-gray-900 truncate">{{ plantilla.nombre }}</h3>
+                {% if plantilla.descripcion %}<p class="text-xs text-gray-500 mt-1 line-clamp-2">{{
+                    plantilla.descripcion }}</p>{% endif %}
+                <div class="mt-3 text-[10px] text-gray-400 flex justify-between items-center">
+                    <span>{{ plantilla.fecha_creacion|date:"d/m/Y" }}</span>
+                    <span class="uppercase font-semibold tracking-wider px-1.5 py-0.5 bg-gray-100 rounded">{{
+                        plantilla.archivo.url|slice:"-3:"|upper }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg border border-gray-200 p-12 text-center shadow-sm">
+        <i class="fas fa-certificate text-5xl text-gray-300 mb-4"></i>
+        <h3 class="text-lg font-medium text-gray-900">No hay plantillas guardadas</h3>
+        <p class="mt-2 text-sm text-gray-500 mb-6">Sube una imagen o PDF base.</p>
+        <a href="{% url 'curso:plantilla_create' %}"
+            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none transition-colors"><i
+                class="fas fa-upload mr-2"></i> Subir Mi Primera Plantilla</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

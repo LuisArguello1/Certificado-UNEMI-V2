@@ -1,0 +1,35 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Eliminar Plantilla{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white shadow-sm rounded-lg border border-red-200 overflow-hidden">
+        <div class="p-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
+                ¿Confirmar eliminación de plantilla?
+            </h1>
+            <p class="text-gray-600 mb-6">
+                Estás a punto de eliminar la plantilla <strong>"{{ object.nombre }}"</strong>.
+                Los cursos que usen esta plantilla como base podrían dejar de generar certificados correctamente.
+                <span class="block mt-2 font-semibold text-red-600">Esta acción no se puede deshacer.</span>
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="flex justify-end space-x-3">
+                    <a href="{% url 'curso:plantilla_list' %}"
+                        class="px-4 py-2 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                        Cancelar
+                    </a>
+                    <button type="submit"
+                        class="px-6 py-2 bg-red-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                        Sí, eliminar plantilla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

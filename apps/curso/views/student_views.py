@@ -61,6 +61,21 @@ class CertificateSearchView(TemplateView):
                 'cursos': Curso.objects.filter(estado='disponible')
             })
 
+class CertificateVerifyView(TemplateView):
+    """
+    Vista pública para verificar la autenticidad de un certificado vía código QR.
+    """
+    template_name = 'curso/public/verify_success.html'
+
+    def get(self, request, code):
+        certificado = get_object_or_404(Certificado, codigo_verificacion=code)
+        
+        return render(request, self.template_name, {
+            'certificado': certificado,
+            'estudiante': certificado.estudiante,
+            'curso': certificado.estudiante.curso
+        })
+
 class CertificateDownloadView(View):
     """
     Vista para descargar el archivo del certificado.

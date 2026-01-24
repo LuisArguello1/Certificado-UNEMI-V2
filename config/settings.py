@@ -61,7 +61,13 @@ THIRD_PARTY_APPS = [
     'widget_tweaks',
     'tailwind',
     'theme',
+    'crispy_forms',
+    'crispy_bootstrap5',
 ]
+
+# Configuración de Crispy Forms
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Aplicaciones locales
 LOCAL_APPS = [

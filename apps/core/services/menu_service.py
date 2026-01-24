@@ -41,7 +41,6 @@ class MenuService:
             'name': 'Historial',
             'icon': 'history',
             'url': correo_list_url,
-            # Active si está en lista o detalle, pero no en crear
             'active': (current_path == correo_list_url or 
                       (current_path.startswith('/correo/') and current_path != correo_create_url))
         })
@@ -53,7 +52,40 @@ class MenuService:
             'active': current_path == correo_create_url
         })
         
-        # Sección de Sistema
-        menu.append({'separator': True, 'label': 'CURSOS'})
+        # Sección de Cursos
+        menu.append({'separator': True, 'label': 'GESTIÓN DE CURSOS'})
+
+        try:
+            curso_list_url = reverse('curso:list')
+            curso_create_url = reverse('curso:create')
+            plantilla_list_url = reverse('curso:plantilla_list')
+        except:
+            curso_list_url = '#'
+            curso_create_url = '#'
+            plantilla_list_url = '#'
+
+        menu.append({
+            'name': 'Cursos',
+            'icon': 'graduation-cap',
+            'url': curso_list_url,
+            'active': (current_path.startswith('/curso/') and 
+                      'plantillas' not in current_path and 
+                      current_path != curso_create_url)
+        })
+
+        menu.append({
+            'name': 'Nuevo Curso',
+            'icon': 'plus-circle',
+            'url': curso_create_url,
+            'active': current_path == curso_create_url
+        })
+
+        # Sección de Plantillas
+        menu.append({
+            'name': 'Plantillas',
+            'icon': 'certificate',
+            'url': plantilla_list_url,
+            'active': 'plantillas' in current_path
+        })
         
         return menu

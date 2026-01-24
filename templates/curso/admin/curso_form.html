@@ -1,0 +1,115 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Curso{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6 border-b border-gray-200 pb-4">
+        <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
+            <i class="fas {% if object %}fa-edit{% else %}fa-plus-circle{% endif %} text-gray-400 mr-2 text-xl"></i>
+            {% if object %}Editar Curso: {{ object.nombre }}{% else %}Nuevo Curso{% endif %}
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Completa la información del curso y sube el listado de estudiantes.</p>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+        <div class="p-6">
+            <form method="post" enctype="multipart/form-data" id="courseForm">
+                {% csrf_token %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="md:col-span-2">
+                        {{ form.nombre|as_crispy_field }}
+                        {{ form.configuracion_certificado }}
+                    </div>
+                    <div class="md:col-span-2">
+                        {{ form.descripcion|as_crispy_field }}
+                    </div>
+                    <div class="md:col-span-2">
+                        {{ form.responsable|as_crispy_field }}
+                    </div>
+                    <div>
+                        {{ form.fecha_inicio|as_crispy_field }}
+                    </div>
+                    <div>
+                        {{ form.fecha_fin|as_crispy_field }}
+                    </div>
+                    <div class="md:col-span-2">
+                        <div class="p-4 bg-blue-50 border border-blue-100 rounded-md mb-4">
+                            <h4 class="text-sm font-semibold text-blue-800 flex items-center mb-2">
+                                <i class="fas fa-info-circle mr-2"></i> Formato de Excel Sugerido
+                            </h4>
+                            <p class="text-xs text-blue-700 leading-relaxed mb-2">
+                                Para una importación exitosa, asegúrate de que tu archivo Excel tenga las siguientes
+                                columnas (el nombre puede variar ligeramente):
+                            </p>
+                            <ul class="text-xs text-blue-700 list-disc ml-5 space-y-1">
+                                <li><strong>Nombres</strong> (o Nombre Completo)</li>
+                                <li><strong>Cedula</strong> (o Cédula, DNI)</li>
+                                <li><strong>Correo</strong> (o Email, Correo Electrónico)</li>
+                            </ul>
+                        </div>
+                        {{ form.archivo_estudiantes|as_crispy_field }}
+                    </div>
+                    <div class="md:col-span-2">
+                        {{ form.plantilla_certificado|as_crispy_field }}
+                    </div>
+                    {% if object and object.pk and object.plantilla_certificado %}
+                    <div class="md:col-span-2 mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
+                            <div class="flex items-center">
+                                <div class="p-3 bg-indigo-100 rounded-lg mr-4">
+                                    <i class="fas fa-drafting-compass text-indigo-600"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-bold text-indigo-900">Configuración Visual Activa</h4>
+                                    <p class="text-xs text-indigo-600 mt-0.5">La posición del certificado ya está definida. ¿Deseas reajustarla?</p>
+                                </div>
+                            </div>
+                            <a href="{% url 'curso:config' object.pk %}"
+                                class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-md shadow-indigo-100">
+                                Ir al Configurador
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-100 flex items-center justify-end space-x-3">
+                    <a href="{% url 'curso:list' %}"
+                        class="px-4 py-2 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">
+                        Cancelar
+                    </a>
+                    <button type="submit" id="submitBtn"
+                        class="px-6 py-2 bg-indigo-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors flex items-center">
+                        <i class="fas fa-save mr-2"></i>
+                        <span id="btnText">Guardar Curso</span>
+                        <span id="spinner" class="hidden ml-2">
+                            <i class="fas fa-spinner fa-spin"></i> Procesando...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('courseForm').addEventListener('submit', function (e) {
+        const btn = document.getElementById('submitBtn');
+        const text = document.getElementById('btnText');
+        const spinner = document.getElementById('spinner');
+
+        // Deshabilitar para evitar doble envío
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        text.classList.add('hidden');
+        spinner.classList.remove('hidden');
+    });
+</script>
+{% endblock %}
