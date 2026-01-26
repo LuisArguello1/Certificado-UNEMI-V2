@@ -36,6 +36,26 @@ class CreateCampaignView(LoginRequiredMixin, CreateView):
             {'name': 'Nueva Campaña'}
         ]
         context['page_title'] = 'Nueva Campaña de Correo'
+        
+        # Preparar cursos con información adicional para el selector visual
+        courses_data = []
+        for curso in Curso.objects.filter(estado='disponible'):
+            # Buscar un certificado de ejemplo (el último generado válido)
+            cert_ejemplo = curso.estudiantes.filter(
+                certificados__archivo_generado__isnull=False
+            ).exclude(
+                certificados__archivo_generado=''
+            ).values_list('certificados__archivo_generado', flat=True).last()
+            
+            courses_data.append({
+                'id': curso.id,
+                'nombre': curso.nombre,
+                'estudiantes_count': curso.estudiantes.count(),
+                'preview_url': f"/media/{cert_ejemplo}" if cert_ejemplo else None,
+                'tiene_certificados': bool(cert_ejemplo)
+            })
+        
+        context['available_courses'] = courses_data
         return context
     
     def form_valid(self, form):
@@ -49,6 +69,15 @@ class CreateCampaignView(LoginRequiredMixin, CreateView):
             subject = form.cleaned_data['subject']
             message = form.cleaned_data['message']
             course = form.cleaned_data['course']
+            
+            # Debug: Log del mensaje recibido
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"=== DEBUG CAMPAÑA ===")
+            logger.info(f"Nombre: {name}")
+            logger.info(f"Mensaje recibido (primeros 200 chars): {message[:200] if message else 'VACÍO'}")
+            logger.info(f"Longitud del mensaje: {len(message) if message else 0}")
+            logger.info(f"====================")
             
             # Validar que el curso tenga estudiantes
             if not course.estudiantes.exists():
@@ -91,6 +120,27 @@ class EditCampaignView(LoginRequiredMixin, UpdateView):
             {'name': 'Editar Campaña'}
         ]
         context['page_title'] = 'Editar Campaña'
+        
+        # Preparar cursos con información adicional para el selector visual
+        courses_data = []
+        for curso in Curso.objects.filter(estado='disponible'):
+            # Buscar un certificado de ejemplo
+            cert_ejemplo = curso.estudiantes.filter(
+                certificados__archivo_generado__isnull=False
+            ).exclude(
+                certificados__archivo_generado=''
+            ).values_list('certificados__archivo_generado', flat=True).last()
+            
+            courses_data.append({
+                'id': curso.id,
+                'nombre': curso.nombre,
+                'estudiantes_count': curso.estudiantes.count(),
+                'preview_url': f"/media/{cert_ejemplo}" if cert_ejemplo else None,
+                'tiene_certificados': bool(cert_ejemplo)
+            })
+        
+        context['available_courses'] = courses_data
+        
         return context
         
     def form_valid(self, form):

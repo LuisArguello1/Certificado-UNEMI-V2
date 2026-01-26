@@ -13,10 +13,12 @@ public_patterns = [
 
 urlpatterns = [
     # URLs de administración
+    path('upload-image/', course_views.CertificateImageUploadView.as_view(), name='upload_image'),
     path('', course_views.CursoListView.as_view(), name='list'),
     path('crear/', course_views.CursoCreateView.as_view(), name='create'),
     path('editar/<int:pk>/', course_views.CursoUpdateView.as_view(), name='edit'),
     path('eliminar/<int:pk>/', course_views.CursoDeleteView.as_view(), name='delete'),
+    path('toggle/<int:pk>/', course_views.CursoToggleStatusView.as_view(), name='toggle_status'),
     path('configurar-certificado/<int:pk>/', course_views.CursoCertificateConfigView.as_view(), name='config'),
     path('estudiantes/<int:pk>/', course_views.CursoEstudiantesView.as_view(), name='estudiantes'),
     path('estudiantes/nuevo/<int:pk>/', course_views.EstudianteCreateView.as_view(), name='estudiante_add'),
@@ -24,6 +26,7 @@ urlpatterns = [
     path('estudiantes/eliminar/<int:pk>/', course_views.EstudianteDeleteView.as_view(), name='estudiante_delete'),
     path('generar-certificado/<int:pk>/', course_views.GenerarCertificadoView.as_view(), name='generar_individual'),
     path('generar-todos/<int:pk>/', course_views.GenerarTodosCertificadosView.as_view(), name='generar_todos'),
+    path('descargar-zip/<int:pk>/', course_views.DescargarCertificadosZipView.as_view(), name='descargar_zip'),
     path('descargar-zip/<int:pk>/', course_views.DescargarCertificadosZipView.as_view(), name='descargar_zip'),
 
     # URLs de plantillas

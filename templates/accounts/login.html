@@ -2,96 +2,171 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión | Sistema Administrativo</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>UNEMI Login - Sistema de Gestión Académica</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
     <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f0f2f5; }
-        .erp-card { background-color: white; border: 1px solid #d1d5db; border-radius: 4px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
-        .erp-input { border-radius: 2px !important; }
-        .erp-btn { border-radius: 3px !important; font-weight: 500; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        .brand-bg {
+            background-color: #111827;
+        }
+        .hero-image {
+            width: 100%;
+            height: 280px;
+            border-bottom-left-radius: 0.75rem;
+            border-bottom-right-radius: 0.75rem;
+            background-size: cover;
+            background-position: center;
+            /* Efecto de desvanecido en la parte superior */
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%);
+            mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 15%, black 40%);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        .input-professional {
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            transition: all 0.2s;
+        }
+        .input-professional:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 0.375rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
+            transform: translateY(-2px);
+        }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
-
-    <div class="w-full max-w-sm erp-card">
-        <!-- Header Compacto -->
-        <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
-            <div class="flex items-center justify-center space-x-2">
-                <i class="fas fa-certificate text-blue-400 text-xl"></i>
-                <h1 class="text-white text-lg font-semibold tracking-wide uppercase">UNEMI - CERTIFICATE</h1>
+<body>
+<div class="flex h-screen w-full overflow-hidden">
+    <!-- Left Panel (Brand) - Fixed Color #111827 -->
+    <div class="hidden lg:flex lg:w-1/2 xl:w-[45%] brand-bg flex-col justify-between p-12 text-white">
+        <!-- Logo Section -->
+        <div class="flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
+                <span class="material-symbols-outlined text-3xl">school</span>
             </div>
+            <span class="text-xl font-bold tracking-wide">UNEMI</span>
         </div>
-
-        <!-- Form -->
-        <div class="p-6" x-data="{ showPass: false }">
-            {% if form.errors %}
-            <div class="mb-5 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-sm text-xs flex items-center">
-                <i class="fas fa-times-circle mr-2"></i> Credenciales inválidas.
+        
+        <!-- Welcome Content -->
+        <div class="flex flex-col gap-6">
+            <div class="hero-image" 
+                 style="background-image: url('{% static 'img/unemi_fondo_login.png' %}');">
             </div>
-            {% endif %}
-
-            <form method="post" class="space-y-5">
-                {% csrf_token %}
-                
-                <div>
-                    <label for="{{ form.username.id_for_label }}" class="block text-xs font-bold text-gray-600 uppercase mb-1">Usuario</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-gray-400">
-                            <i class="fas fa-user text-xs"></i>
-                        </span>
-                        <input type="text" name="username" id="{{ form.username.id_for_label }}" 
-                               autocomplete="username" required
-                               class="w-full pl-8 px-3 py-1.5 text-xs border border-gray-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-colors erp-input">
-                    </div>
-                </div>
-
-                <div>
-                    <label for="{{ form.password.id_for_label }}" class="block text-xs font-bold text-gray-600 uppercase mb-1">Contraseña</label>
-                     <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-2 text-gray-400">
-                             <i class="fas fa-lock text-xs"></i>
-                        </span>
-                        <input :type="showPass ? 'text' : 'password'" 
-                               name="password" id="{{ form.password.id_for_label }}" 
-                               autocomplete="current-password" required
-                               class="w-full pl-8 pr-10 px-3 py-1.5 text-xs border border-gray-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-colors erp-input">
-                        
-                        <button type="button" 
-                                @click="showPass = !showPass" 
-                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
-                            <i class="fas" :class="showPass ? 'fa-eye-slash' : 'fa-eye'" class="text-[10px]"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="pt-2">
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent text-sm text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 erp-btn transition-colors shadow-sm uppercase tracking-wider">
-                        INICIAR SESIÓN
-                    </button>
-                </div>
-            </form>
+            <p class="max-w-md text-base font-normal text-gray-300">
+                Generación de Certificados.
+            </p>
+            <p class="text-sm font-medium text-blue-400">
+                Universidad Estatal de Milagro
+            </p>
         </div>
         
         <!-- Footer -->
-        <div class="bg-gray-50 px-6 py-3 border-t border-gray-200 text-center">
-            <p class="text-xs text-gray-400">Sistema de Gestión Interna &copy; {% now "Y" %}</p>
+        <div class="text-sm text-gray-500">
+            <p>© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
         </div>
     </div>
-
-    <!-- Script para inyectar clases específicas si BaseFormMixin no fuera suficiente para iconos -->
-    <script>
-        document.querySelectorAll('input').forEach(input => {
-            input.classList.add('pl-8'); // Espacio para el icono
-            input.classList.add('rounded-sm'); // Bordes mas rectos
-        });
-    </script>
+    
+    <!-- Right Panel (Login Form) -->
+    <div class="flex w-full lg:w-1/2 xl:w-[55%] flex-col justify-center bg-gray-50 px-8 py-12 lg:px-16">
+        <!-- Mobile Logo -->
+        <div class="mb-8 flex items-center justify-center lg:hidden">
+            <div class="flex h-12 w-12 items-center justify-center rounded-lg brand-bg text-white">
+                <span class="material-symbols-outlined text-3xl">school</span>
+            </div>
+        </div>
+        
+        <div class="mx-auto flex w-full max-w-[420px] flex-col gap-6">
+            <!-- Form Header -->
+            <div class="flex flex-col gap-2 text-center lg:text-left">
+                <h2 class="text-3xl font-bold text-gray-900">Iniciar Sesión</h2>
+                <p class="text-gray-600">Ingresa tus credenciales para acceder al sistema.</p>
+            </div>
+            
+            <!-- Error Messages -->
+            {% if form.errors %}
+            <div class="rounded-md border border-red-300 bg-red-50 p-3.5 text-sm text-red-800">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-lg">error</span>
+                    <span class="font-medium">Credenciales inválidas. Verifica tus datos.</span>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Form -->
+            <form method="post" class="flex flex-col gap-5">
+                {% csrf_token %}
+                
+                <!-- Username -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-gray-700">
+                        Usuario o Correo Institucional
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">person</span>
+                        <input 
+                            class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
+                            placeholder="ej. jperez@unemi.edu.ec" 
+                            type="text"
+                            name="username" 
+                            id="{{ form.username.id_for_label }}"
+                            autocomplete="username"
+                            required
+                        />
+                    </div>
+                </div>
+                
+                <!-- Password -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-gray-700">
+                        Contraseña
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">lock</span>
+                        <input 
+                            class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
+                            placeholder="••••••••" 
+                            type="password"
+                            name="password" 
+                            id="{{ form.password.id_for_label }}"
+                            autocomplete="current-password"
+                            required
+                        />
+                    </div>
+                </div>
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit"
+                    class="btn-primary mt-2 flex h-11 w-full items-center justify-center gap-2 px-6 text-sm font-semibold text-white">
+                    <span>Ingresar al Sistema</span>
+                    <span class="material-symbols-outlined text-base">arrow_forward</span>
+                </button>
+            </form>
+            
+            <!-- Mobile Footer -->
+            <div class="mt-6 border-t border-gray-200 pt-5 text-center lg:hidden">
+                <p class="text-xs text-gray-500">© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>

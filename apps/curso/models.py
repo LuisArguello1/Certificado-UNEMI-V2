@@ -2,6 +2,15 @@ from django.db import models
 from django.core.validators import FileExtensionValidator
 import os
 
+def certificate_directory_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento: certificados_generados/<Nombre_Curso>/<filename>
+    """
+    # Sanitize course name
+    course_name = instance.estudiante.curso.nombre
+    safe_course_name = "".join([c if c.isalnum() or c in (' ', '-', '_') else '_' for c in course_name]).strip()
+    return f'certificados_generados/{safe_course_name}/{filename}'
+
 class PlantillaCertificado(models.Model):
     """
     Modelo para gestionar las plantillas de certificados (fondos).
@@ -27,7 +36,8 @@ class Curso(models.Model):
     """
     Modelo para gestionar los cursos.
     """
-    nombre = models.CharField(max_length=200, verbose_name='Nombre del curso')
+    # Unique=True for course name to safely use it as folder name
+    nombre = models.CharField(max_length=200, verbose_name='Nombre del curso', unique=True, db_index=True)
     descripcion = models.TextField(verbose_name='Descripción', blank= True, null= True)
     responsable = models.CharField(max_length=200, verbose_name='Responsable del curso', blank=False, null=False)
     fecha_inicio = models.DateField(verbose_name='Fecha de inicio', blank=True, null=True)
@@ -58,6 +68,28 @@ class Curso(models.Model):
         verbose_name='Configuración del Certificado',
         help_text='Almacena posiciones, fuentes y texto dinámico.'
     )
+
+    @property
+    def configuracion_certificado_json(self):
+        import json
+        if self.configuracion_certificado:
+            return json.dumps(self.configuracion_certificado)
+        return "{}"
+    
+    ESTADO_CHOICES = [
+        ('disponible', 'Disponible'),
+        ('oculto', 'Oculto'),
+        ('archivado', 'Archivado'),
+    ]
+    
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='disponible',
+        verbose_name='Estado',
+        help_text='Estado del curso en el portal público'
+    )
+    
     fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     actualizado_en = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
 
@@ -116,7 +148,7 @@ class Certificado(models.Model):
         verbose_name='Plantilla utilizada'
     )
     archivo_generado = models.FileField(
-        upload_to='certificados_generados/',
+        upload_to=certificate_directory_path,
         null=True,
         blank=True,
         verbose_name='Certificado Generado'
@@ -126,7 +158,8 @@ class Certificado(models.Model):
         unique=True, 
         null=True, 
         blank=True, 
-        verbose_name='Código de Verificación'
+        verbose_name='Código de Verificación',
+        db_index=True
     )
     fecha_generacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de generación')
 
@@ -134,6 +167,12 @@ class Certificado(models.Model):
         verbose_name = 'Certificado'
         verbose_name_plural = 'Certificados'
         ordering = ['-fecha_generacion']
+        indexes = [
+            models.Index(fields=['codigo_verificacion']),
+            models.Index(fields=['estudiante']),
+            # Useful if we filter certificates by template often
+            models.Index(fields=['plantilla']), 
+        ]
 
     def __str__(self):
         return f"Certificado de {self.estudiante.nombre_completo}"

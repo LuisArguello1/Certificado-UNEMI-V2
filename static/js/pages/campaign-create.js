@@ -60,12 +60,19 @@ document.addEventListener("DOMContentLoaded", function () {
     if (messageInput) {
         messageInput.style.display = 'none';
 
+        // Cargar contenido inicial si existe
         if (messageInput.value) {
             quill.root.innerHTML = messageInput.value;
         }
 
-        document.querySelector('form').onsubmit = function () {
+        // Función para sincronizar contenido de Quill al input oculto
+        function syncQuillContent() {
             let htmlContent = quill.root.innerHTML;
+
+            // Limpiar contenido vacío (solo <p><br></p> significa vacío)
+            if (htmlContent === '<p><br></p>') {
+                htmlContent = '';
+            }
 
             // Reemplazos de alineación para soporte email
             htmlContent = htmlContent
@@ -74,6 +81,74 @@ document.addEventListener("DOMContentLoaded", function () {
                 .replace(/class="ql-align-justify"/g, 'style="text-align: justify; display: block;"');
 
             messageInput.value = htmlContent;
-        };
+
+            // Debug en consola
+            console.log('Contenido sincronizado:', htmlContent.substring(0, 100));
+        }
+
+        // Sincronizar cuando cambia el contenido (en tiempo real)
+        quill.on('text-change', function () {
+            syncQuillContent();
+        });
+
+        // Sincronizar antes de enviar el formulario (crítico)
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function (e) {
+            syncQuillContent();
+            console.log('Formulario enviado con mensaje:', messageInput.value.substring(0, 100));
+        });
     }
 });
+
+// === COURSE SELECTION MODAL LOGIC ===
+window.openModal = function (modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+window.closeModal = function (modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+window.selectCourse = function (id, name, count, previewUrl) {
+    // 1. Update Hidden Input
+    const input = document.getElementById('id_course');
+    if (input) input.value = id;
+
+    // 2. Update Visual Details
+    const nameEl = document.getElementById('selected-course-name');
+    const countEl = document.getElementById('selected-course-count');
+
+    if (nameEl) nameEl.textContent = name;
+    if (countEl) countEl.textContent = count;
+
+    // 3. Handle PDF Preview Button
+    const previewContainer = document.getElementById('pdf-preview-link');
+    const previewBtn = document.getElementById('btn-view-pdf');
+
+    // previewUrl can be "None" string if coming from template parsing sometimes, or empty logic
+    if (previewUrl && previewUrl !== 'None' && previewUrl !== '') {
+        previewContainer.classList.remove('hidden');
+        previewBtn.href = previewUrl;
+    } else {
+        previewContainer.classList.add('hidden');
+        previewBtn.href = '#';
+    }
+
+    // 4. Toggle States
+    const noState = document.getElementById('no-course-state');
+    const selectedState = document.getElementById('course-selected-state');
+
+    if (noState) noState.classList.add('hidden');
+    if (selectedState) selectedState.classList.remove('hidden');
+
+    // 5. Close Modal
+    closeModal('courseModal');
+}

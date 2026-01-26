@@ -1,8 +1,14 @@
-from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy, reverse
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, View
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
-from django.http import HttpResponse, Http404
+from django.core.files.storage import FileSystemStorage
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, Http404, JsonResponse
+import uuid
+from django.shortcuts import get_object_or_404
 from ..models import Curso, Estudiante, PlantillaCertificado, Certificado
 from ..forms.curso_form import CursoForm, PlantillaCertificadoForm, CursoCertificateConfigForm, EstudianteForm
 import json
@@ -109,18 +115,46 @@ class ExcelProcessMixin:
             messages.error(self.request, f"Error al procesar el Excel: {str(e)}")
 
 
-class CursoListView(ListView):
+class CursoListView(LoginRequiredMixin, ListView):
     model = Curso
     template_name = 'curso/admin/curso_list.html'
     context_object_name = 'cursos'
     paginate_by = 10
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [{'name': 'Cursos'}]
+        context['page_title'] = 'Lista de Cursos'
+        return context
 
 
-class CursoCreateView(ExcelProcessMixin, CreateView):
+class CursoCreateView(LoginRequiredMixin, ExcelProcessMixin, CreateView):
     model = Curso
     form_class = CursoForm
     template_name = 'curso/admin/curso_form.html'
     success_url = reverse_lazy('curso:list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': 'Crear Curso'}
+        ]
+        context['page_title'] = 'Crear Nuevo Curso'
+        context['plantillas_disponibles'] = PlantillaCertificado.objects.all()
+        return context
 
     def form_valid(self, form):
         # Limpiar nombre y responsable (sin saltos de línea)
@@ -143,11 +177,27 @@ class CursoCreateView(ExcelProcessMixin, CreateView):
         return response
 
 
-class CursoUpdateView(ExcelProcessMixin, UpdateView):
+class CursoUpdateView(LoginRequiredMixin, ExcelProcessMixin, UpdateView):
     model = Curso
     form_class = CursoForm
     template_name = 'curso/admin/curso_form.html'
     success_url = reverse_lazy('curso:list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': 'Editar Curso'}
+        ]
+        context['page_title'] = f'Editar: {self.object.nombre}'
+        context['plantillas_disponibles'] = PlantillaCertificado.objects.all()
+        return context
 
     def form_valid(self, form):
         # Limpiar nombre y responsable (sin saltos de línea)
@@ -169,52 +219,156 @@ class CursoUpdateView(ExcelProcessMixin, UpdateView):
         return super().form_valid(form)
 
 
-class CursoDeleteView(DeleteView):
+class CursoDeleteView(LoginRequiredMixin, DeleteView):
     model = Curso
     template_name = 'curso/admin/curso_confirm_delete.html'
     success_url = reverse_lazy('curso:list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': 'Eliminar Curso'}
+        ]
+        context['page_title'] = 'Eliminar Curso'
+        return context
+
+
+class CursoToggleStatusView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        try:
+            curso = Curso.objects.get(pk=pk)
+            # Toggle logic: disponible <-> oculto
+            if curso.estado == 'disponible':
+                curso.estado = 'oculto'
+                is_active = False
+            else:
+                curso.estado = 'disponible'
+                is_active = True
+                
+            curso.save(update_fields=['estado'])
+            
+            return HttpResponse(
+                json.dumps({'success': True, 'is_active': is_active, 'message': 'Estado actualizado correctamente.'}),
+                content_type='application/json'
+            )
+        except Curso.DoesNotExist:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': 'Curso no encontrado.'}),
+                content_type='application/json',
+                status=404
+            )
+        except Exception as e:
+            return HttpResponse(
+                json.dumps({'success': False, 'error': str(e)}),
+                content_type='application/json',
+                status=500
+            )
 
 
 # --- Vistas de Plantillas ---
 
-class PlantillaListView(ListView):
+class PlantillaListView(LoginRequiredMixin, ListView):
     model = PlantillaCertificado
     template_name = 'curso/admin/plantilla_list.html'
     context_object_name = 'plantillas'
     paginate_by = 10
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [{'name': 'Plantillas de Certificados'}]
+        context['page_title'] = 'Plantillas de Certificados'
+        return context
 
 
-class PlantillaCreateView(CreateView):
+class PlantillaCreateView(LoginRequiredMixin, CreateView):
     model = PlantillaCertificado
     form_class = PlantillaCertificadoForm
     template_name = 'curso/admin/plantilla_form.html'
     success_url = reverse_lazy('curso:plantilla_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Plantillas', 'url': reverse('curso:plantilla_list')},
+            {'name': 'Crear Plantilla'}
+        ]
+        context['page_title'] = 'Crear Nueva Plantilla'
+        return context
 
     def form_valid(self, form):
         messages.success(self.request, "Plantilla creada correctamente.")
         return super().form_valid(form)
 
 
-class PlantillaUpdateView(UpdateView):
+class PlantillaUpdateView(LoginRequiredMixin, UpdateView):
     model = PlantillaCertificado
     form_class = PlantillaCertificadoForm
     template_name = 'curso/admin/plantilla_form.html'
     success_url = reverse_lazy('curso:plantilla_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Plantillas', 'url': reverse('curso:plantilla_list')},
+            {'name': 'Editar Plantilla'}
+        ]
+        context['page_title'] = f'Editar: {self.object.nombre}'
+        return context
 
     def form_valid(self, form):
         messages.success(self.request, "Plantilla actualizada correctamente.")
         return super().form_valid(form)
 
 
-class PlantillaDeleteView(DeleteView):
+class PlantillaDeleteView(LoginRequiredMixin, DeleteView):
     model = PlantillaCertificado
     template_name = 'curso/admin/plantilla_confirm_delete.html'
     success_url = reverse_lazy('curso:plantilla_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Plantillas', 'url': reverse('curso:plantilla_list')},
+            {'name': 'Eliminar Plantilla'}
+        ]
+        context['page_title'] = 'Eliminar Plantilla'
+        return context
 
 
 # --- Configuración de Certificado por Curso ---
 
-class CursoCertificateConfigView(UpdateView):
+class CursoCertificateConfigView(LoginRequiredMixin, UpdateView):
     model = Curso
     form_class = CursoCertificateConfigForm
     template_name = 'curso/admin/curso_certificate_config.html'
@@ -224,6 +378,18 @@ class CursoCertificateConfigView(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': self.object.nombre, 'url': reverse('curso:estudiantes', kwargs={'pk': self.object.pk})},
+            {'name': 'Configurar Certificado'}
+        ]
+        context['page_title'] = f'Configurar Certificado - {self.object.nombre}'
         # Tomar el primer estudiante para la previsualización real
         context['preview_student'] = self.object.estudiantes.first()
         return context
@@ -235,21 +401,34 @@ class CursoCertificateConfigView(UpdateView):
 
 # --- Gestión de Estudiantes y Certificados ---
 
-class CursoEstudiantesView(ListView):
+class CursoEstudiantesView(LoginRequiredMixin, ListView):
     model = Estudiante
     template_name = 'curso/admin/curso_estudiantes.html'
     context_object_name = 'estudiantes'
 
     def get_queryset(self):
-        return Estudiante.objects.filter(curso_id=self.kwargs['pk'])
+        # Optimization: Prefetch verification to avoid N+1 queries when listing certificates
+        return Estudiante.objects.filter(curso_id=self.kwargs['pk']).prefetch_related('certificados')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         curso = Curso.objects.get(pk=self.kwargs['pk'])
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': curso.nombre}
+        ]
+        context['page_title'] = f'Estudiantes - {curso.nombre}'
         context['curso'] = curso
         # Verificar si hay al menos un certificado generado para habilitar el ZIP
+        # Optimized check
         context['estudiantes_con_cert'] = Certificado.objects.filter(
-            estudiante__curso=curso, 
+            estudiante__curso_id=curso.pk, 
             archivo_generado__isnull=False
         ).exclude(archivo_generado='').exists()
         return context
@@ -257,37 +436,86 @@ class CursoEstudiantesView(ListView):
 
 # --- CRUD de Estudiantes (Admin) ---
 
-class EstudianteCreateView(CreateView):
+class EstudianteCreateView(LoginRequiredMixin, CreateView):
     model = Estudiante
     form_class = EstudianteForm
     template_name = 'curso/admin/estudiante_form.html'
 
     def get_success_url(self):
         return reverse_lazy('curso:estudiantes', kwargs={'pk': self.kwargs['pk']})
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        curso = Curso.objects.get(pk=self.kwargs['pk'])
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': curso.nombre, 'url': reverse('curso:estudiantes', kwargs={'pk': curso.pk})},
+            {'name': 'Registrar Estudiante'}
+        ]
+        context['page_title'] = 'Registrar Nuevo Estudiante'
+        return context
 
     def form_valid(self, form):
         form.instance.curso_id = self.kwargs['pk']
         messages.success(self.request, "Estudiante registrado con éxito.")
         return super().form_valid(form)
 
-class EstudianteUpdateView(UpdateView):
+class EstudianteUpdateView(LoginRequiredMixin, UpdateView):
     model = Estudiante
     form_class = EstudianteForm
     template_name = 'curso/admin/estudiante_form.html'
     
     def get_success_url(self):
         return reverse_lazy('curso:estudiantes', kwargs={'pk': self.object.curso.pk})
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': self.object.curso.nombre, 'url': reverse('curso:estudiantes', kwargs={'pk': self.object.curso.pk})},
+            {'name': 'Editar Estudiante'}
+        ]
+        context['page_title'] = f'Editar: {self.object.nombre_completo}'
+        return context
 
     def form_valid(self, form):
         messages.success(self.request, "Datos del estudiante actualizados.")
         return super().form_valid(form)
 
-class EstudianteDeleteView(DeleteView):
+class EstudianteDeleteView(LoginRequiredMixin, DeleteView):
     model = Estudiante
     template_name = 'curso/admin/estudiante_confirm_delete.html'
     
     def get_success_url(self):
         return reverse_lazy('curso:estudiantes', kwargs={'pk': self.object.curso.pk})
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        try:
+            from apps.core.services.menu_service import MenuService
+            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+        except ImportError:
+            context['menu_items'] = []
+            
+        context['breadcrumbs'] = [
+            {'name': 'Cursos', 'url': reverse('curso:list')},
+            {'name': self.object.curso.nombre, 'url': reverse('curso:estudiantes', kwargs={'pk': self.object.curso.pk})},
+            {'name': 'Eliminar Estudiante'}
+        ]
+        context['page_title'] = 'Eliminar Estudiante'
+        return context
 
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, "Estudiante eliminado del curso.")
@@ -299,7 +527,8 @@ class GenerarCertificadoView(UpdateView):
     """
     def post(self, request, pk):
         from ..services.certificate_service import CertificateService
-        estudiante = Estudiante.objects.get(pk=pk)
+        # Optimization: Select related to avoid extra query for course
+        estudiante = get_object_or_404(Estudiante.objects.select_related('curso'), pk=pk)
         curso = estudiante.curso
 
         if not curso.plantilla_certificado or not curso.configuracion_certificado:
@@ -326,6 +555,8 @@ class GenerarTodosCertificadosView(UpdateView):
     def post(self, request, pk):
         from ..services.certificate_service import CertificateService
         curso = Curso.objects.get(pk=pk)
+        # Optimization: Use iterator() for large datasets if needed, though for generation step by step 
+        # standard iteration is mostly IO bound by PDF generation.
         estudiantes = Estudiante.objects.filter(curso=curso)
         
         exitos = 0
@@ -360,23 +591,54 @@ class DescargarCertificadosZipView(ListView):
     """
     def get(self, request, pk):
         curso = Curso.objects.get(pk=pk)
-        estudiantes = Estudiante.objects.filter(curso=curso)
+        
+        # Optimization: Fetch ONLY students that effectively have certificates 
+        # and prefetch those certificates to avoid N+1.
+        # This is much faster than getting all students and then filtering in python
+        # or doing query per student.
+        estudiantes_con_cert = Estudiante.objects.filter(
+            curso=curso,
+            certificados__archivo_generado__isnull=False
+        ).prefetch_related('certificados').distinct()
         
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, 'w') as zip_file:
-            for estudiante in estudiantes:
-                certificado = Certificado.objects.filter(estudiante=estudiante).first()
-                if certificado and certificado.archivo_generado:
+            for estudiante in estudiantes_con_cert:
+                # With prefetch, this does not hit DB again
+                certificado = estudiante.certificados.all()[0]
+                
+                if certificado.archivo_generado:
                     # Nombre del archivo dentro del ZIP
                     nombre_est = estudiante.nombre_completo.replace(" ", "_").upper()
                     zip_path = f"{nombre_est}_{estudiante.cedula}.pdf"
-                    zip_file.write(certificado.archivo_generado.path, zip_path)
+                    
+                    try:
+                         # We need full path on disk
+                        zip_file.write(certificado.archivo_generado.path, zip_path)
+                    except ValueError:
+                         # File might be missing on disk even if DB record exists
+                        pass
         
         if buffer.tell() == 0:
-            messages.warning(request, "No hay certificados generados para descargar.")
+            messages.warning(request, "No hay certificados generados válidos para descargar.")
             return redirect('curso:estudiantes', pk=pk)
             
         buffer.seek(0)
         response = HttpResponse(buffer.read(), content_type='application/zip')
         response['Content-Disposition'] = f'attachment; filename="Certificados_{curso.nombre.replace(" ", "_")}.zip"'
         return response
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CertificateImageUploadView(LoginRequiredMixin, View):
+    def post(self, request):
+        if 'image' not in request.FILES:
+            return JsonResponse({'error': 'No image provided'}, status=400)
+        
+        image = request.FILES['image']
+        fs = FileSystemStorage()
+        
+        # Save with unique name to avoid overwrite issues
+        filename = fs.save(f'certificate_assets/{uuid.uuid4()}_{image.name}', image)
+        file_url = fs.url(filename)
+        
+        return JsonResponse({'url': file_url})

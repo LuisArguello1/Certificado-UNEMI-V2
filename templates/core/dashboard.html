@@ -1,35 +1,515 @@
 {% extends 'layouts/base.html' %}
-
-{% block title %}Dashboard - Certicate{% endblock %}
+{% load widget_tweaks %}
+{% block title %}Dashboard - Certificados UNEMI{% endblock %}
 
 {% block content %}
-<div class="px-5 py-6 max-w-[1600px] mx-auto space-y-6 animate-fade-in">
-
-    <!-- Top Bar: Status & Quick Actions -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 md:p-6">
+    <div class="max-w-[1920px] mx-auto space-y-4">
         
+        <!-- SECCIÓN 1: Métricas Principales con Gráficos -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            <!-- Card: Cursos con mini gráfico -->
+            <div class="group relative overflow-hidden backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="text-2xl font-bold text-slate-800 tracking-tight">{{ total_cursos }}</div>
+                            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">Cursos Activos</div>
+                        </div>
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                            <i class="fas fa-book text-base"></i>
+                        </div>
+                    </div>
+                    <canvas id="cursosChart" height="40"></canvas>
+                </div>
+            </div>
+
+            <!-- Card: Estudiantes con progreso -->
+            <div class="group relative overflow-hidden backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-emerald-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="text-2xl font-bold text-slate-800 tracking-tight">{{ total_estudiantes }}</div>
+                            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">Estudiantes</div>
+                        </div>
+                        <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                            <i class="fas fa-users text-base"></i>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[10px] text-slate-600">
+                            <span>Con certificado</span>
+                            <span class="font-semibold">{{ tasa_certificacion }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200/50 h-1.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 h-full transition-all duration-500" style="width: {{ tasa_certificacion }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Certificados con mini chart -->
+            <div class="group relative overflow-hidden backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
+                <div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-amber-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="text-2xl font-bold text-slate-800 tracking-tight">{{ total_certificados }}</div>
+                            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">Certificados</div>
+                        </div>
+                        <div class="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                            <i class="fas fa-certificate text-base"></i>
+                        </div>
+                    </div>
+                    <canvas id="certificadosChart" height="40"></canvas>
+                </div>
+            </div>
+
+            <!-- Card: Correos con estadísticas -->
+            <div class="group relative overflow-hidden backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300">
+                <div class="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-sky-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="relative p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <div class="text-2xl font-bold text-slate-800 tracking-tight">{{ total_campañas }}</div>
+                            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">Campañas</div>
+                        </div>
+                        <div class="w-10 h-10 bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                            <i class="fas fa-envelope text-base"></i>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <div class="flex justify-between text-[10px] text-slate-600">
+                            <span>Tasa de éxito</span>
+                            <span class="font-semibold">{{ tasa_exito_correos }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200/50 h-1.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-sky-500 to-sky-600 h-full transition-all duration-500" style="width: {{ tasa_exito_correos }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN GRID CONTENT -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            
+            <!-- LEFT COLUMN: Analytics & Data (2/3 width) -->
+            <div class="xl:col-span-2 space-y-4">
+                
+                <!-- Gráfico Principal: Tendencias de Certificados -->
+                <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-200/50 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-chart-line text-slate-400 text-[10px]"></i>
+                            Actividad de Certificados
+                        </h3>
+                        <div class="flex gap-2 text-[10px]">
+                            <span class="px-2 py-0.5 bg-amber-100/70 text-amber-700 font-semibold uppercase tracking-wider">{{ certificados_hoy }} Hoy</span>
+                            <span class="px-2 py-0.5 bg-blue-100/70 text-blue-700 font-semibold uppercase tracking-wider">{{ certificados_semana }} Semana</span>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <canvas id="certificadosLineChart" height="80"></canvas>
+                    </div>
+                </div>
+
+                <!-- Row: Distribution & Email Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <!-- Panel: Distribución con Donut Chart -->
+                    <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                        <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50">
+                            <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fas fa-chart-pie text-slate-400 text-[10px]"></i>
+                                Distribución de Cursos
+                            </h3>
+                        </div>
+                        <div class="p-4">
+                            <canvas id="cursosDistChart" height="180"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Email Performance con Barras -->
+                    <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                        <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50">
+                            <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fas fa-paper-plane text-slate-400 text-[10px]"></i>
+                                Rendimiento de Envíos
+                            </h3>
+                        </div>
+                        <div class="p-4">
+                            <canvas id="emailStatsChart" height="180"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel: Top Cursos -->
+                <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-star text-slate-400 text-[10px]"></i>
+                            Top Cursos por Estudiantes
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="text-[10px] text-slate-500 uppercase bg-slate-50/50 border-b border-slate-200/50">
+                                <tr>
+                                    <th class="px-4 py-2 font-semibold text-left tracking-wider">Curso</th>
+                                    <th class="px-4 py-2 font-semibold text-left tracking-wider">Responsable</th>
+                                    <th class="px-4 py-2 font-semibold text-center tracking-wider">Estudiantes</th>
+                                    <th class="px-4 py-2 font-semibold text-center tracking-wider">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100/50">
+                                {% for curso in top_cursos %}
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-4 py-2.5 font-medium text-slate-800">{{ curso.nombre|truncatechars:45 }}</td>
+                                    <td class="px-4 py-2.5 text-slate-600">{{ curso.responsable|truncatechars:30 }}</td>
+                                    <td class="px-4 py-2.5 text-center">
+                                        <span class="inline-flex items-center justify-center px-2 py-0.5 bg-blue-100/70 text-blue-800 font-semibold">
+                                            {{ curso.num_estudiantes }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center">
+                                        {% if curso.estado == 'disponible' %}
+                                            <span class="inline-flex px-2 py-0.5 text-[10px] font-semibold bg-emerald-100/70 text-emerald-700 uppercase tracking-wider">Disponible</span>
+                                        {% elif curso.estado == 'oculto' %}
+                                            <span class="inline-flex px-2 py-0.5 text-[10px] font-semibold bg-amber-100/70 text-amber-700 uppercase tracking-wider">Oculto</span>
+                                        {% else %}
+                                            <span class="inline-flex px-2 py-0.5 text-[10px] font-semibold bg-slate-100/70 text-slate-700 uppercase tracking-wider">Archivado</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-4 py-6 text-center text-slate-400 text-xs">No hay cursos destacados</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Panel: Campañas Recientes -->
+                <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-bullhorn text-slate-400 text-[10px]"></i>
+                            Últimas Campañas de Correo
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="text-[10px] text-slate-500 uppercase bg-slate-50/50 border-b border-slate-200/50">
+                                <tr>
+                                    <th class="px-4 py-2 font-semibold text-left tracking-wider">Campaña</th>
+                                    <th class="px-4 py-2 font-semibold text-left tracking-wider">Curso</th>
+                                    <th class="px-4 py-2 font-semibold text-center tracking-wider">Progreso</th>
+                                    <th class="px-4 py-2 font-semibold text-center tracking-wider">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100/50">
+                                {% for campaña in campañas_recientes %}
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-4 py-2.5 font-medium text-slate-800">{{ campaña.name|truncatechars:35 }}</td>
+                                    <td class="px-4 py-2.5 text-slate-600">{{ campaña.course.nombre|truncatechars:25 }}</td>
+                                    <td class="px-4 py-2.5">
+                                        <div class="flex flex-col gap-1">
+                                            <div class="text-center font-mono text-[10px] text-slate-600">
+                                                {{ campaña.sent_count }}/{{ campaña.total_recipients }}
+                                            </div>
+                                            <div class="w-full bg-slate-200/50 h-1 overflow-hidden">
+                                                {% widthratio campaña.sent_count campaña.total_recipients 100 as progress %}
+                                                <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-full" style="width: {{ progress }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center">
+                                        {% if campaña.status == 'completed' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-green-100/70 text-green-700 uppercase tracking-wider">
+                                                <span class="w-1 h-1 bg-green-500 mr-1.5"></span>Completado
+                                            </span>
+                                        {% elif campaña.status == 'processing' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-blue-100/70 text-blue-700 uppercase tracking-wider">
+                                                <span class="w-1 h-1 bg-blue-500 mr-1.5 animate-pulse"></span>Procesando
+                                            </span>
+                                        {% elif campaña.status == 'failed' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-red-100/70 text-red-700 uppercase tracking-wider">
+                                                <span class="w-1 h-1 bg-red-500 mr-1.5"></span>Fallido
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-slate-100/70 text-slate-700 uppercase tracking-wider">
+                                                <span class="w-1 h-1 bg-slate-500 mr-1.5"></span>Borrador
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-4 py-6 text-center text-slate-400 text-xs">No hay campañas recientes</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Activity Feeds (1/3 width) -->
+            <div class="space-y-4">
+                
+                <!-- Panel: Certificados Recientes -->
+                <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-history text-slate-400 text-[10px]"></i>
+                            Certificados Generados
+                        </h3>
+                        <div class="text-[10px] text-green-700 font-semibold bg-green-100/70 px-2 py-0.5 uppercase tracking-wider">
+                            +{{ certificados_hoy }} hoy
+                        </div>
+                    </div>
+                    <div class="divide-y divide-slate-100/50">
+                        {% for cert in certificados_recientes %}
+                        <div class="p-3 hover:bg-slate-50/50 transition-colors flex gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 bg-amber-50/70 flex items-center justify-center text-amber-600 border border-amber-200/50">
+                                <i class="fas fa-file-pdf text-xs"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-semibold text-slate-800 truncate">
+                                    {{ cert.estudiante.nombre_completo }}
+                                </p>
+                                <p class="text-[11px] text-slate-500 truncate mt-0.5">
+                                    {{ cert.estudiante.curso.nombre }}
+                                </p>
+                                <p class="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
+                                    <i class="far fa-clock"></i>
+                                    {{ cert.fecha_generacion|timesince }}
+                                </p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="p-6 text-center text-xs text-slate-400">Sin actividad reciente</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Panel: Estudiantes Recientes -->
+                <div class="backdrop-blur-sm bg-white/80 border border-slate-200/60 shadow-sm overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-200/50 bg-slate-50/50">
+                        <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-user-clock text-slate-400 text-[10px]"></i>
+                            Últimos Inscritos
+                        </h3>
+                    </div>
+                    <div class="divide-y divide-slate-100/50">
+                        {% for estudiante in estudiantes_recientes %}
+                        <div class="p-3 hover:bg-slate-50/50 transition-colors flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                <div class="w-8 h-8 bg-blue-50/70 text-blue-700 flex items-center justify-center text-[11px] font-bold border border-blue-200/50 flex-shrink-0">
+                                    {{ estudiante.nombre_completo|make_list|first|upper }}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-slate-800 text-xs truncate">
+                                        {{ estudiante.nombre_completo }}
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 truncate">
+                                        {{ estudiante.curso.nombre }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-[10px] text-slate-400 whitespace-nowrap flex-shrink-0">
+                                {{ estudiante.fecha_registro|timesince }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="p-6 text-center text-xs text-slate-400">No hay registros recientes</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
     </div>
 </div>
 
-<style>
-    @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-    .animate-shimmer {
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-        animation: shimmer 2s infinite;
-    }
-    .animate-spin-once {
-        animation: spin 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-</style>
-{% endblock %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartDefaults = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                padding: 8,
+                titleFont: {size: 11},
+                bodyFont: {size: 10},
+                cornerRadius: 2
+            }
+        },
+        scales: {
+            x: {display: false},
+            y: {display: false}
+        }
+    };
 
-{% block extra_js %}
+    // Mini Sparkline - Cursos por estado
+    new Chart(document.getElementById('cursosChart'), {
+        type: 'bar',
+        data: {
+            labels: [{% for item in cursos_por_estado %}'{{ item.estado }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for item in cursos_por_estado %}{{ item.total }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
+                borderRadius: 2
+            }]
+        },
+        options: chartDefaults
+    });
 
+    // Mini Line - Últimos certificados (simulado con últimos 7 días)
+    new Chart(document.getElementById('certificadosChart'), {
+        type: 'line',
+        data: {
+            labels: ['', '', '', '', '', '', ''],
+            datasets: [{
+                data: [12, 19, 15, 25, 22, 30, {{ certificados_hoy }}],
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 0,
+                borderWidth: 2
+            }]
+        },
+        options: chartDefaults
+    });
+
+    // Gráfico de línea principal - Certificados por semana
+    new Chart(document.getElementById('certificadosLineChart'), {
+        type: 'line',
+        data: {
+            labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+            datasets: [{
+                label: 'Certificados',
+                data: [45, 52, 38, 65, 59, 48, {{ certificados_hoy }}],
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#f59e0b',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {display: false},
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 10,
+                    cornerRadius: 2,
+                    titleFont: {size: 12},
+                    bodyFont: {size: 11}
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {color: 'rgba(148, 163, 184, 0.1)'},
+                    ticks: {font: {size: 10}, color: '#64748b'}
+                },
+                x: {
+                    grid: {display: false},
+                    ticks: {font: {size: 10}, color: '#64748b'}
+                }
+            }
+        }
+    });
+
+    // Donut Chart - Distribución de Cursos
+    new Chart(document.getElementById('cursosDistChart'), {
+        type: 'doughnut',
+        data: {
+            labels: [{% for item in cursos_por_estado %}'{{ item.estado|title }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for item in cursos_por_estado %}{{ item.total }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: ['#10b981', '#f59e0b', '#64748b'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 12,
+                        font: {size: 10},
+                        color: '#64748b',
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 10,
+                    cornerRadius: 2
+                }
+            }
+        }
+    });
+
+    // Bar Chart - Email Statistics
+    new Chart(document.getElementById('emailStatsChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Enviados', 'Fallidos', 'Pendientes', 'Activas'],
+            datasets: [{
+                data: [{{ correos_enviados }}, {{ correos_fallidos }}, {{ correos_pendientes }}, {{ campañas_activas }}],
+                backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'],
+                borderRadius: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {display: false},
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 10,
+                    cornerRadius: 2
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {color: 'rgba(148, 163, 184, 0.1)'},
+                    ticks: {font: {size: 10}, color: '#64748b'}
+                },
+                x: {
+                    grid: {display: false},
+                    ticks: {font: {size: 9}, color: '#64748b'}
+                }
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

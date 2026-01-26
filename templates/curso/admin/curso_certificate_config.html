@@ -1,464 +1,286 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
-{% load crispy_forms_tags %}
 
-{% block title %}Diseñador de Certificados Pro - Unemi{% endblock %}
+{% block title %}Editor de Certificados - {{ object.nombre }}{% endblock %}
 
 {% block extra_css %}
-<style>
-    /* Layout de 3 columnas */
-    .editor-layout {
-        display: grid;
-        grid-template-columns: 320px 1fr 280px;
-        gap: 0;
-        height: calc(100vh - 120px);
-        background: #f1f5f9;
-        margin: -24px; /* Compensar padding del contenedor base if exists */
-    }
-
-    /* Columna Izquierda: Herramientas */
-    .tools-sidebar {
-        background: white;
-        border-right: 1px solid #e2e8f0;
-        padding: 24px;
-        overflow-y: auto;
-    }
-
-    /* Centro: Canvas */
-    .canvas-container {
-        padding: 40px;
-        overflow: auto;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-    }
-
-    #certificate-area {
-        position: relative;
-        background: white;
-        box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.2);
-        user-select: none;
-    }
-
-    #certificate-bg {
-        display: block;
-        max-width: none; /* Permitir que la imagen mande en el scroll */
-    }
-
-    /* Columna Derecha: Bloques */
-    .blocks-sidebar {
-        background: white;
-        border-left: 1px solid #e2e8f0;
-        padding: 20px;
-        overflow-y: auto;
-    }
-
-    /* Elementos Draggables */
-    .draggable-element {
-        position: absolute;
-        padding: 4px 8px;
-        cursor: move;
-        z-index: 10;
-        white-space: nowrap;
-        transform: translate(-50%, -50%); /* El x,y es el centro real */
-        border: 2px solid transparent;
-        border-radius: 4px;
-    }
-
-    .draggable-element:hover {
-        border-color: rgba(79, 70, 229, 0.3);
-        background: rgba(79, 70, 229, 0.05);
-    }
-
-    .draggable-element.active {
-        border-color: #4f46e5;
-        background: rgba(79, 70, 229, 0.1);
-        z-index: 20;
-    }
-
-    /* Tarjetas de Bloques en Sidebar */
-    .block-card {
-        padding: 12px;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .block-card:hover { border-color: #4f46e5; }
-    .block-card.active {
-        border-color: #4f46e5;
-        background: #f5f3ff;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .add-btn {
-        @apply w-full mb-2 flex items-center justify-between px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition;
-    }
-</style>
+   <link rel="stylesheet" href="{% static 'css/editor_certificado.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="editor-layout">
+<div class="ppt-editor">
     
-    <!-- PANEL IZQUIERDO: HERRAMIENTAS -->
-    <aside class="tools-sidebar">
-        <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6 border-b pb-2">Configuración</h3>
-        
-        <!-- Controles Globales/Selección -->
-        <div id="no-selection-msg" class="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <p class="text-xs text-gray-400 italic">Selecciona un bloque para editar sus propiedades.</p>
-        </div>
-
-        <div id="controls-area" class="hidden space-y-6">
-            <div class="flex items-center justify-between mb-2">
-                <span id="block-type-label" class="text-[10px] font-black bg-indigo-100 text-indigo-700 px-2 py-1 rounded">TITULO</span>
-                <button id="btn-delete" class="text-red-400 hover:text-red-600 transition"><i class="fas fa-trash-alt"></i></button>
-            </div>
-
-            <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-wide">Tamaño de Letra</label>
-                <div class="flex items-center gap-4">
-                    <input type="range" id="input-size" min="8" max="150" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
-                    <span id="size-val" class="text-xs font-bold text-gray-700 w-8">24px</span>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-wide">Color del Texto</label>
-                <input type="color" id="input-color" class="w-full h-10 p-0.5 border border-gray-200 rounded bg-white cursor-pointer">
-            </div>
-
-            <div class="flex gap-2">
-                <button id="toggle-bold" class="flex-1 py-2 border border-gray-200 rounded text-xs font-bold hover:bg-gray-50">B</button>
-                <button id="toggle-italic" class="flex-1 py-2 border border-gray-200 rounded text-xs italic hover:bg-gray-50">I</button>
+    <!-- BARRA SUPERIOR -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <div class="toolbar-title">
+                <i class="fas fa-certificate"></i>
+                Editor de Certificados
             </div>
             
-            <div class="pt-4 border-t border-gray-100">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-wide">Texto Contenido</label>
-                <textarea id="block-text-edit" rows="3" class="w-full p-2 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-indigo-500"></textarea>
+            <div class="dropdown">
+                <button class="tool-btn" onclick="toggleDropdown(event)">
+                    <i class="fas fa-plus"></i> Añadir <i class="fas fa-caret-down" style="margin-left:4px"></i>
+                </button>
+                <div id="dropdown" class="dropdown-content">
+                    <div class="dropdown-item" onclick="addBlock('textbox'); closeDropdown()">
+                        <i class="fas fa-font"></i> Cuadro de Texto
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('image'); closeDropdown()">
+                        <i class="fas fa-image"></i> Imagen
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('textbox'); closeDropdown()">
+                        <i class="fas fa-font"></i> Cuadro de Texto
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('title'); closeDropdown()">
+                        <i class="fas fa-heading"></i> Título
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('subtitle'); closeDropdown()">
+                        <i class="fas fa-align-center"></i> Subtítulo
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('student'); closeDropdown()">
+                        <i class="fas fa-user-graduate"></i> Nombre Estudiante
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('course'); closeDropdown()">
+                        <i class="fas fa-book"></i> Nombre Curso
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('dates'); closeDropdown()">
+                        <i class="fas fa-calendar"></i> Fechas
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('responsible'); closeDropdown()">
+                        <i class="fas fa-user-tie"></i> Responsable
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('signature'); closeDropdown()">
+                        <i class="fas fa-pen-fancy"></i> Línea de Firma
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('footer'); closeDropdown()">
+                        <i class="fas fa-quote-right"></i> Pie de Página
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('cedula'); closeDropdown()">
+                        <i class="fas fa-id-card"></i> Cédula
+                    </div>
+                    <div class="dropdown-item" onclick="addBlock('issue_date'); closeDropdown()">
+                        <i class="far fa-calendar-check"></i> Fecha de Emisión
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Botones para agregar -->
-        <div class="mt-8 pt-8 border-t border-gray-100 space-y-2">
-            <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Añadir Bloques</h4>
-            <button class="add-btn" onclick="addBlock('title')"><span>+ Título</span><i class="fas fa-heading opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('subtitle')"><span>+ Subtítulo</span><i class="fas fa-align-center opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('student')"><span>+ Nombre Estudiante</span><i class="fas fa-user-graduate opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('course')"><span>+ Nombre Curso</span><i class="fas fa-book opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('dates')"><span>+ Fechas</span><i class="fas fa-calendar-day opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('responsible')"><span>+ Responsable</span><i class="fas fa-user-tie opacity-30"></i></button>
-            <button class="add-btn" onclick="addBlock('footer')"><span>+ Pie de Página</span><i class="fas fa-quote-right opacity-30"></i></button>
+        <div class="toolbar-center">
+            <div class="zoom-group">
+                <button onclick="setZoom(0.5, this)" class="zoom-btn">50%</button>
+                <button class="zoom-btn active" onclick="setZoom(0.75)">75%</button>
+                <button class="zoom-btn" onclick="setZoom(1)">100%</button>
+                <button class="zoom-btn" onclick="setZoom(1.5)">150%</button>
+                <button class="zoom-btn" onclick="fitToWindow()" title="Ajustar">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
         </div>
 
-        <div class="mt-10">
-            <button onclick="loadTemplate()" class="w-full py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition font-black text-xs uppercase tracking-widest flex items-center justify-center">
-                <i class="fas fa-copy mr-2"></i> Cargar Plantilla Full
+        <div class="toolbar-right">
+            <button class="tool-btn primary" onclick="saveConfig()">
+                <i class="fas fa-save"></i> GUARDAR
             </button>
+            <a href="{% url 'curso:estudiantes' object.pk %}" class="tool-btn">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
         </div>
-    </aside>
+    </div>
 
-    <!-- PANEL CENTRAL: CANVAS -->
-    <main class="canvas-container">
-                <div id="certificate-area" class="bg-white">
-                    <img id="certificate-bg" src="{{ object.plantilla_certificado.archivo.url }}" alt="Template">
-                    
-                    <!-- Bloques Individuales Draggables con Datos Reales para Preview -->
-                    <div id="block-title" class="draggable-element block-title" data-title="Título Principal">CERTIFICADO DE PARTICIPACIÓN</div>
-                    <div id="block-intro" class="draggable-element block-text" data-title="Introducción">Por medio de la presente se certifica que:</div>
-                    <div id="block-student" class="draggable-element block-name" data-title="Nombre del Estudiante">{{ preview_student.nombre_completo|default:"ARELIS RUIZ SEGOVIA"|upper }}</div>
-                    <div id="block-course-intro" class="draggable-element block-text" data-title="Texto del Curso">ha participado en el curso:</div>
-                    <div id="block-course-name" class="draggable-element block-course" data-title="Nombre del Curso">"{{ object.nombre|upper }}"</div>
-                    <div id="block-details" class="draggable-element block-text" data-title="Fechas y Periodo">con una duración desde {{ object.fecha_inicio|date:"d/m/Y" }} hasta {{ object.fecha_fin|date:"d/m/Y" }},</div>
-                    <div id="block-responsible" class="draggable-element block-text" data-title="Responsable">bajo la responsabilidad de {{ object.responsable }}.</div>
-                    <div id="block-emision" class="draggable-element block-text" data-title="Fecha Emisión" style="font-style: italic; opacity: 0.8;">En constancia se expide el presente el {% now "j \d\e F \d\e Y" %}.</div>
+    <!-- ÁREA PRINCIPAL -->
+    <div class="main-area">
+        
+        <!-- WORKSPACE -->
+        <div class="workspace" id="workspace">
+            <div class="canvas-container" id="canvasContainer">
+                <div id="certificate-area">
+                    <img id="certificate-bg" src="{{ object.plantilla_certificado.archivo.url }}" alt="Certificado Base">
+                    <div id="grid-overlay" class="grid-overlay"></div>
                 </div>
-    </main>
-
-    <!-- PANEL DERECHO: LISTA DE BLOQUES -->
-    <aside class="blocks-sidebar">
-        <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6 border-b pb-2">Elementos</h3>
-        <div id="blocks-list" class="space-y-3">
-            <!-- Items de la lista se inyectan aquí -->
+            </div>
         </div>
 
-        <div class="mt-10 pt-6 border-t border-gray-100">
-            <button id="btn-save" class="w-full py-3 bg-indigo-600 text-white rounded-lg shadow-lg hover:bg-indigo-700 transition font-black text-xs uppercase tracking-widest">
-                <i class="fas fa-save mr-2"></i> Guardar Todo
-            </button>
-            <a href="{% url 'curso:estudiantes' object.pk %}" class="block text-center mt-4 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase">Cancelar</a>
-        </div>
-    </aside>
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('props')">Propiedades</button>
+                <button class="tab" onclick="switchTab('elements')">Elementos</button>
+            </div>
 
-    <!-- Formulario Oculto -->
-    <form id="hidden-form" method="post" action="{% url 'curso:config' object.pk %}" class="hidden">
+            <div class="tab-content">
+                <!-- TAB PROPIEDADES -->
+                <div id="tab-props" class="tab-pane active">
+                    <div id="no-selection" class="empty-state">
+                        <i class="fas fa-mouse-pointer" style="font-size:32px;opacity:0.3;margin-bottom:12px"></i>
+                        <p style="font-size:12px">Selecciona un elemento para editar</p>
+                    </div>
+
+                    <div id="props-panel" style="display:none">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #eee">
+                            <span id="block-type" style="font-size:10px;font-weight:700;background:#e3f2fd;color:#1976d2;padding:4px 8px;border-radius:3px;text-transform:uppercase"></span>
+                            <button onclick="deleteBlock()" style="border:none;background:none;color:#ef4444;cursor:pointer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Texto</label>
+                            <textarea id="text" class="prop-input" rows="4"></textarea>
+                        </div>
+
+                        <div class="prop-group" id="imageGroup" style="display:none">
+                            <label class="prop-label">Imagen</label>
+                            
+                            <div style="display:flex;gap:8px;margin-bottom:8px">
+                                <button onclick="document.getElementById('imgUpload').click()" class="btn-upload-premium" style="width:100%;justify-content:center">
+                                    <i class="fas fa-magic mr-2"></i> Seleccionar Imagen
+                                </button>
+                                <input type="file" id="imgUpload" accept="image/*" style="display:none" onchange="uploadImage(this)">
+                            </div>
+                            <p style="font-size:9px;color:#888;margin-top:4px;text-align:center">Selecciona una imagen de tu dispositivo.</p>
+                        </div>
+
+                        <div class="prop-group" id="nameFormatGroup" style="display:none">
+                            <label class="prop-label">Formato de Nombre</label>
+                            <select id="nameFormat" class="prop-select">
+                                <option value="full">Completo (Juan Carlos Perez)</option>
+                                <option value="first_last">Primer Nombre + Apellido (Juan Perez)</option>
+                                <option value="f_last">Inicial + Apellido (J. Perez)</option>
+                                <option value="first_l">Nombre + Inicial (Juan P.)</option>
+                            </select>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Fuente</label>
+                            <select id="fontFamily" class="prop-select">
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="Times New Roman, serif">Times New Roman</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="Courier New, monospace">Courier New</option>
+                                <option value="Verdana, sans-serif">Verdana</option>
+                                <option value="Ubuntu, sans-serif">Ubuntu</option>
+                                <option value="Noto Sans, sans-serif">Noto Sans</option>
+                                <option value="Noto Serif, serif">Noto Serif</option>
+                                <option value="Liberation Sans, sans-serif">Liberation Sans</option>
+                                <option value="Liberation Serif, serif">Liberation Serif</option>
+                            </select>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Tamaño</label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="range" id="fontSize" class="prop-slider" min="8" max="150" style="flex:1">
+                                <span id="fontSizeVal" style="font-size:11px;font-weight:600;width:40px;text-align:right">24px</span>
+                            </div>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Color</label>
+                            <input type="color" id="color" class="prop-input" style="height:40px">
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Alineación</label>
+                            <div class="btn-group">
+                                <button id="btnLeft" class="btn-prop" onclick="setAlign('left')" title="Izquierda">
+                                    <i class="fas fa-align-left"></i>
+                                </button>
+                                <button id="btnCenter" class="btn-prop active" onclick="setAlign('center')" title="Centro">
+                                    <i class="fas fa-align-center"></i>
+                                </button>
+                                <button id="btnRight" class="btn-prop" onclick="setAlign('right')" title="Derecha">
+                                    <i class="fas fa-align-right"></i>
+                                </button>
+                                <button id="btnJustify" onclick="setAlign('justify')" class="btn-prop" title="Justificar">
+                                    <i class="fas fa-align-justify"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Estilo</label>
+                            <div class="btn-group">
+                                <button id="btnBold" class="btn-prop" onclick="toggleBold()"><i class="fas fa-bold"></i></button>
+                                <button id="btnItalic" class="btn-prop" onclick="toggleItalic()"><i class="fas fa-italic"></i></button>
+                                <button id="btnUnderline" class="btn-prop" onclick="toggleUnderline()"><i class="fas fa-underline"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Espaciado de Letras</label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="range" id="letterSpacing" class="prop-slider" min="-2" max="10" step="0.5" value="0" style="flex:1">
+                                <span id="letterSpacingVal" style="font-size:11px;font-weight:600;width:40px;text-align:right">0px</span>
+                            </div>
+                        </div>
+
+                        <div class="prop-group">
+                            <label class="prop-label">Opacidad</label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="range" id="opacity" class="prop-slider" min="0" max="1" step="0.1" value="1" style="flex:1">
+                                <span id="opacityVal" style="font-size:11px;font-weight:600;width:40px;text-align:right">100%</span>
+                            </div>
+                        </div>
+
+
+
+                        <div class="prop-group">
+                            <label class="prop-label">Rotación</label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="range" id="rotation" class="prop-slider" min="0" max="360" step="1" value="0" style="flex:1">
+                                <span id="rotationVal" style="font-size:11px;font-weight:600;width:40px;text-align:right">0°</span>
+                            </div>
+                        </div>
+
+                        <div class="prop-group" id="dimensionsGroup">
+                            <label class="prop-label">Dimensiones (%)</label>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <div style="flex:1">
+                                    <label style="font-size:9px;color:#666">Ancho</label>
+                                    <input type="number" id="widthPct" class="prop-input" min="1" max="100" style="padding:4px">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:9px;color:#666">Alto</label>
+                                    <input type="number" id="heightPct" class="prop-input" min="1" max="100" style="padding:4px" placeholder="Auto">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- TAB ELEMENTOS -->
+                <div id="tab-elements" class="tab-pane">
+                    <div id="blocks-list"></div>
+                    <div id="empty-elements" class="empty-state" style="display:none">
+                        <i class="fas fa-layer-group" style="font-size:32px;opacity:0.3;margin-bottom:12px"></i>
+                        <p style="font-size:12px">No hay elementos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FORM OCULTO -->
+    <form id="saveForm" method="post" action="{% url 'curso:config' object.pk %}" style="display:none">
         {% csrf_token %}
         <input type="hidden" name="plantilla_certificado" value="{{ object.plantilla_certificado.pk }}">
-        <input type="hidden" id="configuracion_json" name="configuracion_certificado">
+        <input type="hidden" id="config" name="configuracion_certificado">
     </form>
+    
+    <!-- Configuración guardada para el editor -->
+    <!-- Configuración guardada para el editor (Script seguro para JSON) -->
+    {{ object.configuracion_certificado_json|json_script:"config-data" }}
+    <input type="hidden" id="savedConfig" value=""> <!-- Deprecated, kept for safety if needed by other scripts momentarily -->
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const DEFAULT_POSITIONS = {
-        title: { x_pct: 50, y_pct: 15, fontSize: 48, color: '#2E7D32', text: 'CERTIFICADO DE PARTICIPACIÓN', bold: true },
-        subtitle: { x_pct: 50, y_pct: 22, fontSize: 20, color: '#666666', text: 'Por medio de la presente se certifica que:' },
-        student: { x_pct: 50, y_pct: 35, fontSize: 42, color: '#2E7D32', text: '{{ preview_student.nombre_completo|default:"ARELIS RUIZ SEGOVIA"|upper }}', bold: true },
-        course_intro: { x_pct: 50, y_pct: 45, fontSize: 18, color: '#666666', text: 'ha participado en el curso:' },
-        course: { x_pct: 50, y_pct: 52, fontSize: 32, color: '#1a237e', text: '"{{ object.nombre|upper }}"', bold: true },
-        dates: { x_pct: 50, y_pct: 62, fontSize: 18, color: '#666666', text: 'con una duración desde {{ object.fecha_inicio|date:"d/m/Y" }} hasta {{ object.fecha_fin|date:"d/m/Y" }},' },
-        responsible: { x_pct: 50, y_pct: 68, fontSize: 18, color: '#666666', text: 'bajo la responsabilidad de {{ object.responsable }}.' },
-        footer: { x_pct: 50, y_pct: 78, fontSize: 16, color: '#888888', text: 'En constancia se expide el presente el {% now "j \d\e F \d\e Y" %}.' }
-    };
-
-    let textBlocks = [];
-    let selectedBlockId = null;
-    const canvas = document.getElementById('certificate-area');
-    const blocksList = document.getElementById('blocks-list');
-
-    // Inicializar
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedConfig = '{{ object.configuracion_certificado|safe }}';
-        if (savedConfig && savedConfig !== 'None') {
-            try {
-                const config = JSON.parse(savedConfig);
-                textBlocks = Object.keys(config).map(id => ({ id, ...config[id] }));
-                renderAll();
-            } catch (e) { console.error("Error cargando config:", e); }
-        }
-    });
-
-    const PLACEHOLDER_MAP = {
-        'student': '[NOMBRE DEL ESTUDIANTE]',
-        'course': '"[NOMBRE DEL CURSO]"',
-        'responsible': 'bajo la responsabilidad de [RESPONSABLE].',
-        'dates': 'con una duración desde [FECHA_INICIO] hasta [FECHA_FIN],',
-        'footer': 'En constancia se expide el presente el [FECHA_EMISION].',
-        'title': 'CERTIFICADO DE PARTICIPACIÓN',
-        'subtitle': 'Por medio de la presente se certifica que:',
-        'course_intro': 'ha participado en el curso:'
-    };
-
-    function addBlock(type) {
-        const id = 'block_' + Date.now();
-        const base = DEFAULT_POSITIONS[type];
-        
-        // Calcular desplazamiento inteligente
-        const sameTypeCount = textBlocks.filter(b => b.type === type).length;
-        const offsetY = sameTypeCount * 5; // desplazamiento en porcentaje
-
-        const newBlock = {
-            id, type,
-            x_pct: base.x_pct,
-            y_pct: base.y_pct + offsetY,
-            fontSize: base.fontSize,
-            color: base.color,
-            text: base.text,
-            bold: !!base.bold,
-            italic: !!base.italic
-        };
-
-        textBlocks.push(newBlock);
-        renderAll();
-        selectBlock(id);
-    }
-
-    function loadTemplate() {
-        textBlocks = Object.keys(DEFAULT_POSITIONS).map(type => ({
-            id: 'block_' + type + '_' + Date.now(),
-            type,
-            ...DEFAULT_POSITIONS[type]
-        }));
-        renderAll();
-    }
-
-    function renderAll() {
-        // Limpiar
-        const els = canvas.querySelectorAll('.draggable-element');
-        els.forEach(el => el.remove());
-        blocksList.innerHTML = '';
-
-        textBlocks.forEach(block => {
-            // Renderizar en Canvas
-            const el = document.createElement('div');
-            el.id = block.id;
-            el.className = `draggable-element ${selectedBlockId === block.id ? 'active' : ''}`;
-            el.style.left = block.x_pct + '%';
-            el.style.top = block.y_pct + '%';
-            el.style.fontSize = block.fontSize + 'px';
-            el.style.color = block.color;
-            el.style.fontWeight = block.bold ? '800' : 'normal';
-            el.style.fontStyle = block.italic ? 'italic' : 'normal';
-            el.innerText = block.text;
-
-            el.onclick = (e) => { e.stopPropagation(); selectBlock(block.id); };
-            initDrag(el);
-            canvas.appendChild(el);
-
-            // Renderizar en Sidebar Lista
-            const card = document.createElement('div');
-            card.className = `block-card ${selectedBlockId === block.id ? 'active' : ''}`;
-            card.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-[9px] font-black text-indigo-500 uppercase">${block.type}</p>
-                        <p class="text-xs font-bold text-gray-700 truncate w-40">${block.text}</p>
-                    </div>
-                </div>
-            `;
-            card.onclick = () => selectBlock(block.id);
-            blocksList.appendChild(card);
-        });
-    }
-
-    function selectBlock(id) {
-        selectedBlockId = id;
-        const block = textBlocks.find(b => b.id === id);
-        
-        // Actualizar UI
-        document.querySelectorAll('.draggable-element').forEach(el => el.classList.toggle('active', el.id === id));
-        document.querySelectorAll('.block-card').forEach((el, idx) => el.classList.toggle('active', textBlocks[idx].id === id));
-
-        const area = document.getElementById('controls-area');
-        const empty = document.getElementById('no-selection-msg');
-        
-        if (block) {
-            area.classList.remove('hidden');
-            empty.classList.add('hidden');
-            
-            document.getElementById('block-type-label').innerText = block.type.toUpperCase();
-            document.getElementById('input-size').value = block.fontSize;
-            document.getElementById('size-val').innerText = block.fontSize + 'px';
-            document.getElementById('input-color').value = block.color;
-            document.getElementById('block-text-edit').value = block.text;
-            document.getElementById('toggle-bold').classList.toggle('bg-indigo-100', block.bold);
-            document.getElementById('toggle-italic').classList.toggle('bg-indigo-100', block.italic);
-        } else {
-            area.classList.add('hidden');
-            empty.classList.remove('hidden');
-        }
-    }
-
-    // --- CONTROLES EVENTOS ---
-    document.getElementById('input-size').addEventListener('input', (e) => {
-        if (!selectedBlockId) return;
-        const val = e.target.value;
-        const block = textBlocks.find(b => b.id === selectedBlockId);
-        block.fontSize = parseInt(val);
-        document.getElementById('size-val').innerText = val + 'px';
-        updateElement(selectedBlockId);
-    });
-
-    document.getElementById('input-color').addEventListener('input', (e) => {
-        if (!selectedBlockId) return;
-        const block = textBlocks.find(b => b.id === selectedBlockId);
-        block.color = e.target.value;
-        updateElement(selectedBlockId);
-    });
-
-    document.getElementById('block-text-edit').addEventListener('input', (e) => {
-        if (!selectedBlockId) return;
-        const block = textBlocks.find(b => b.id === selectedBlockId);
-        block.text = e.target.value;
-        updateElement(selectedBlockId);
-    });
-
-    document.getElementById('toggle-bold').onclick = () => {
-        if (!selectedBlockId) return;
-        const block = textBlocks.find(b => b.id === selectedBlockId);
-        block.bold = !block.bold;
-        renderAll();
-        selectBlock(selectedBlockId);
-    };
-
-    document.getElementById('toggle-italic').onclick = () => {
-        if (!selectedBlockId) return;
-        const block = textBlocks.find(b => b.id === selectedBlockId);
-        block.italic = !block.italic;
-        renderAll();
-        selectBlock(selectedBlockId);
-    };
-
-    document.getElementById('btn-delete').onclick = () => {
-        if (!selectedBlockId) return;
-        textBlocks = textBlocks.filter(b => b.id !== selectedBlockId);
-        selectedBlockId = null;
-        renderAll();
-        selectBlock(null);
-    };
-
-    function updateElement(id) {
-        const block = textBlocks.find(b => b.id === id);
-        const el = document.getElementById(id);
-        if (el && block) {
-            el.style.fontSize = block.fontSize + 'px';
-            el.style.color = block.color;
-            el.innerText = block.text;
-        }
-    }
-
-    // --- DRAG LOGIC ---
-    function initDrag(el) {
-        let isDragging = false;
-        let startX, startY;
-
-        el.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            e.stopPropagation();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            
-            // En porcentaje
-            const pctX = (dx / canvas.offsetWidth) * 100;
-            const pctY = (dy / canvas.offsetHeight) * 100;
-
-            const block = textBlocks.find(b => b.id === el.id);
-            block.x_pct = parseFloat(block.x_pct) + pctX;
-            block.y_pct = parseFloat(block.y_pct) + pctY;
-
-            el.style.left = block.x_pct + '%';
-            el.style.top = block.y_pct + '%';
-
-            startX = e.clientX;
-            startY = e.clientY;
-        });
-
-        document.addEventListener('mouseup', () => { isDragging = false; });
-    }
-
-        document.getElementById('btn-save').onclick = () => {
-            const config = {};
-            textBlocks.forEach(b => {
-                // Si el bloque es de un tipo conocido, forzamos el placeholder en el guardado
-                // Esto asegura que el servidor reemplace los datos reales del alumno
-                const textToSave = PLACEHOLDER_MAP[b.type] || b.text;
-
-                config[b.id] = {
-                    x: b.x_pct,
-                    y: b.y_pct,
-                    x_web: b.x_pct,
-                    y_web: b.y_pct,
-                    font_size: b.fontSize,
-                    color: b.color,
-                    bold: b.bold,
-                    italic: b.italic,
-                    type: b.type,
-                    text_override: textToSave, // GUARDAMOS EL PLACEHOLDER
-                    container_w: canvas.offsetWidth,
-                    container_h: canvas.offsetHeight
-                };
-            });
-            document.getElementById('configuracion_json').value = JSON.stringify(config);
-            document.getElementById('hidden-form').submit();
-        };
+    const UPLOAD_URL = "/curso/upload-image/";
 </script>
+<script src="{% static 'js/editor_certificado.js' %}"></script>
 {% endblock %}

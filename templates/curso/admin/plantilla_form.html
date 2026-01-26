@@ -5,51 +5,214 @@
 {% block title %}{% if object %}Editar{% else %}Subir{% endif %} Plantilla{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
-    <div class="mb-6 border-b border-gray-200 pb-4">
-        <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
-            <i class="fas {% if object %}fa-edit{% else %}fa-upload{% endif %} text-gray-400 mr-2 text-xl"></i>
-            {% if object %}Editar Plantilla: {{ object.nombre }}{% else %}Subir Nueva Plantilla{% endif %}
+<div class="max-w-3xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8 border-b border-gray-200 pb-5 text-center">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-4">
+            <i class="fas {% if object %}fa-paint-brush{% else %}fa-cloud-upload-alt{% endif %} text-xl"></i>
+        </div>
+        <h1 class="text-2xl font-black text-gray-800 tracking-tight">
+            {% if object %}Editar Plantilla{% else %}Nueva Plantilla de Certificado{% endif %}
         </h1>
-        <p class="text-sm text-gray-500 mt-1">Sube la imagen de fondo o PDF base para los certificados.</p>
+        <p class="text-sm text-gray-500 mt-2 max-w-lg mx-auto">Sube una imagen (PNG/JPG) o PDF que servirá como fondo base para tus certificados. Asegúrate de que tenga buena resolución.</p>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-        <div class="p-6">
-            <form method="post" enctype="multipart/form-data">
+    <div class="bg-white shadow-xl shadow-blue-50/50 rounded-2xl border border-gray-200 overflow-hidden relative">
+        <!-- Decoration -->
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+
+        <div class="p-8">
+            <form method="post" enctype="multipart/form-data" id="plantillaForm">
                 {% csrf_token %}
 
-                <div class="space-y-6">
-                    {{ form.nombre|as_crispy_field }}
+                {% if form.non_field_errors %}
+                <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
 
-                    <div class="p-4 bg-amber-50 border border-amber-100 rounded-md">
-                        <h4 class="text-sm font-semibold text-amber-800 flex items-center mb-2">
-                            <i class="fas fa-exclamation-circle mr-2"></i> Formatos Soportados
-                        </h4>
-                        <p class="text-xs text-amber-700 leading-relaxed">
-                            Puedes subir imágenes (<strong>PNG, JPG, JPEG</strong>) o archivos <strong>PDF</strong>.
-                            Recomendamos una resolución de 1920x1080px o mayor para mejor calidad de impresión.
-                        </p>
+                <div class="space-y-6">
+                    <div>
+                        {{ form.nombre|as_crispy_field }}
                     </div>
 
-                    {{ form.archivo|as_crispy_field }}
+                    <!-- Drag & Drop Upload -->
+                     <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Archivo Base (Imagen o PDF)</label>
+                        <div id="drop-zone" class="relative group border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-gray-50 hover:border-indigo-400 transition-all cursor-pointer bg-white">
+                            
+                            <!-- Initial State -->
+                            <div id="upload-prompt" class="{% if object.archivo %}hidden{% endif %}">
+                                <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-image text-2xl"></i>
+                                </div>
+                                <p class="text-sm font-bold text-gray-700">Arrastra tu archivo aquí</p>
+                                <p class="text-xs text-gray-500 mt-1">Soporta PNG, JPG, PDF (Max 10MB)</p>
+                                <p class="text-xs text-indigo-600 mt-3 font-medium bg-indigo-50 px-3 py-1 rounded-full inline-block">Explorar archivos</p>
+                            </div>
 
-                    {{ form.descripcion|as_crispy_field }}
+                            <!-- Preview State (if editing or uploaded) -->
+                             <div id="file-preview" class="{% if not object.archivo %}hidden{% endif %} w-full flex flex-col items-center">
+                                {% if object.archivo and object.archivo.url|lower|slice:"-4:" != ".pdf" %}
+                                    <img src="{{ object.archivo.url }}" class="h-48 object-contain rounded-lg shadow-sm border border-gray-200 mb-3" id="img-preview-tag">
+                                {% else %}
+                                    <div class="h-32 w-32 bg-red-50 rounded-lg flex items-center justify-center mb-3">
+                                        <i class="fas fa-file-pdf text-5xl text-red-500"></i>
+                                    </div>
+                                {% endif %}
+                                <span id="file-name" class="text-sm font-bold text-gray-800 break-all px-4">
+                                    {% if object.archivo %}{{ object.archivo.name }}{% endif %}
+                                </span>
+                                <p class="text-xs text-green-600 mt-1 font-bold"><i class="fas fa-check-circle mr-1"></i> Archivo seleccionado</p>
+                             </div>
+
+                            <!-- Actual Input -->
+                            <input type="file" name="archivo" id="id_archivo" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".png,.jpg,.jpeg,.pdf">
+                        </div>
+                        {% if form.archivo.errors %}
+                        <p class="text-xs text-red-600 mt-2 font-bold">{{ form.archivo.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        {{ form.descripcion|as_crispy_field }}
+                    </div>
                 </div>
 
-                <div class="mt-8 pt-6 border-t border-gray-100 flex items-center justify-end space-x-3">
+                <div class="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between">
                     <a href="{% url 'curso:plantilla_list' %}"
-                        class="px-4 py-2 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">
-                        Cancelar
+                        class="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
+                        CANCELAR
                     </a>
-                    <button type="submit"
-                        class="px-6 py-2 bg-indigo-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                        <i class="fas fa-save mr-2"></i>
-                        {% if object %}Actualizar{% else %}Subir y Guardar{% endif %}
+                    <button type="submit" id="submitBtn"
+                        class="px-8 py-2.5 bg-indigo-600 border border-transparent rounded-lg shadow-lg shadow-indigo-200 text-sm font-bold text-white hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 focus:outline-none transition-all flex items-center">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>
+                        <span id="btnText">{% if object %}ACTUALIZAR{% else %}SUBIR AHORA{% endif %}</span>
+                        <span id="spinner" class="hidden ml-2">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </span>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('id_archivo');
+        const promptDiv = document.getElementById('upload-prompt');
+        const previewDiv = document.getElementById('file-preview');
+        const fileNameSpan = document.getElementById('file-name');
+        const imgPreview = document.getElementById('img-preview-tag');
+
+        // Drag & Drop Events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                
+                // VALIDATION
+                const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+                const validExts = ['.jpg', '.jpeg', '.png', '.pdf'];
+                const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                
+                if (!validTypes.includes(file.type) && !validExts.includes(fileExt)) {
+                    alert('Solo se permiten archivos de Imagen (JPG, PNG) o PDF.');
+                    fileInput.value = ''; // Reset
+                    return;
+                }
+
+                fileInput.files = files; // Sync input
+
+                // Update UI
+                promptDiv.classList.add('hidden');
+                previewDiv.classList.remove('hidden');
+                fileNameSpan.textContent = file.name;
+
+                // Preview Logic
+                const isImage = file.type.startsWith('image/') || ['.jpg', '.jpeg', '.png'].includes(fileExt);
+                
+                if (isImage && imgPreview) {
+                    // Show Image Preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        imgPreview.src = e.target.result;
+                        imgPreview.classList.remove('hidden');
+                    }
+                    reader.readAsDataURL(file);
+                    // Hide PDF icon if it was visible (hacky but safer to just use logic)
+                     const pdfIcon = previewDiv.querySelector('.fa-file-pdf');
+                     if(pdfIcon) pdfIcon.parentNode.classList.add('hidden');
+                } else {
+                    // Show PDF Icon
+                    if (imgPreview) imgPreview.classList.add('hidden');
+                     // Ensure PDF icon container is visible (we might need to create it if not present in DOM logic above, 
+                     // but assuming the static HTML serves as base). 
+                     // Let's refine the HTML structure below to support toggling.
+                     
+                     // Force redraw of icons if needed or simplified:
+                     let pdfContainer = previewDiv.querySelector('.bg-red-50');
+                     if (!pdfContainer) {
+                         // Create if doesn't exist (dynamic)
+                         pdfContainer = document.createElement('div');
+                         pdfContainer.className = 'h-32 w-32 bg-red-50 rounded-lg flex items-center justify-center mb-3';
+                         pdfContainer.innerHTML = '<i class="fas fa-file-pdf text-5xl text-red-500"></i>';
+                         previewDiv.insertBefore(pdfContainer, fileNameSpan);
+                     }
+                     pdfContainer.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Submit loading state
+        document.getElementById('plantillaForm').addEventListener('submit', function() {
+            if (this.checkValidity()) {
+                const btn = document.getElementById('submitBtn');
+                btn.classList.add('opacity-75', 'cursor-not-allowed', 'scale-95');
+                document.getElementById('spinner').classList.remove('hidden');
+                document.getElementById('btnText').textContent = 'Subiendo...';
+            }
+        });
+    });
+</script>
 {% endblock %}

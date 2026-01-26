@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        /* WeasyPrint Fonts: Usamos solo fuentes del sistema disponibles en el servidor
+           Para mejorar compatibilidad, podríamos instalar fuentes en el servidor Django,
+           pero por ahora usamos las fuentes estándar que WeasyPrint puede encontrar. */
+        
+        @page {
+            size: {{ width }}px {{ height }}px;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            width: {{ width }}px;
+            height: {{ height }}px;
+            overflow: hidden;
+            position: relative;
+            background-color: white;
+            /* Default font */
+            font-family: Arial, Helvetica, sans-serif; 
+        }
+        .bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            user-select: none;
+        }
+        .bg-image {
+            width: 100%;
+            height: 100%;
+            object-fit: fill; /* Match exact pixel container size */
+        }
+        .content-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+        .element {
+            position: absolute;
+            box-sizing: border-box;
+            white-space: pre-line;
+            word-wrap: break-word;
+            padding: 0; 
+            line-height: 1; /* Eliminating leading to prevent proportional drift */
+            vertical-align: top;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Layer -->
+    <div class="bg-layer">
+        {% if bg_uri %}
+        <img src="{{ bg_uri }}" class="bg-image">
+        {% endif %}
+    </div>
+
+    <!-- Content Layer -->
+    <!-- Content Layer -->
+    <!-- Content Layer -->
+    <div class="content-layer">
+        {% for block in blocks %}
+        <div class="element" style="
+            left: {{ block.x }}px;
+            top: {{ block.y }}px;
+            width: {{ block.width }}px;
+            font-size: {{ block.fontSize }}px;
+            color: {{ block.color }};
+            font-family: {{ block.fontFamily|safe }};
+            text-align: {{ block.textAlign }};
+            letter-spacing: {{ block.letterSpacing }}px;
+            opacity: {{ block.opacity }};
+            line-height: 1 !important;
+            {% if block.bold %}font-weight: bold;{% endif %}
+            {% if block.italic %}font-style: italic;{% endif %}
+            {% if block.underline %}text-decoration: underline;{% endif %}
+            transform: rotate({{ block.rotation|default:0 }}deg);
+            vertical-align: top;
+            {% if block.type == 'image' %}
+                display: block;
+                {% if block.height %}height: {{ block.height }}px;{% endif %}
+            {% else %}
+                display: flex !important;
+                align-items: flex-start !important;
+                justify-content: {% if block.textAlign == 'center' %}center{% elif block.textAlign == 'right' %}flex-end{% else %}flex-start{% endif %} !important;
+                height: auto !important;
+                min-height: 0;
+                {% if block.type == 'signature' %}
+                    border-top: 2px solid {{ block.color }};
+                    padding-top: 10px;
+                {% endif %}
+            {% endif %}
+        ">
+            {% if block.type == 'image' %}
+                <img src="{{ block.src }}" style="width: 100%; height: 100%; display: block; object-fit: fill;">
+            {% else %}
+                {% if block.type == 'signature' %}
+                    {# Remove underscores if present #}
+                    <span style="display:block; margin:0; padding:0; line-height:1;">{{ block.text|cut:"_" }}</span>
+                {% else %}
+                    <span style="display:block; margin:0; padding:0; line-height:1;">{{ block.text }}</span>
+                {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- QR Code Special Handling -->
+        {% if qr_data %}
+        <div class="element" style="
+            left: {{ qr_data.x }}px;
+            top: {{ qr_data.y }}px;
+            width: {{ qr_data.width }}px;
+            height: {{ qr_data.width }}px; 
+            z-index: 20;
+        ">
+            <img src="data:image/png;base64,{{ qr_data.image }}" style="width: 100%; height: auto;">
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

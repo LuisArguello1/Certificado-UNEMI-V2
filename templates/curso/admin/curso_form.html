@@ -5,111 +5,401 @@
 {% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Curso{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div class="max-w-5xl mx-auto">
     <!-- Header -->
-    <div class="mb-6 border-b border-gray-200 pb-4">
-        <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
-            <i class="fas {% if object %}fa-edit{% else %}fa-plus-circle{% endif %} text-gray-400 mr-2 text-xl"></i>
-            {% if object %}Editar Curso: {{ object.nombre }}{% else %}Nuevo Curso{% endif %}
+    <div class="mb-8 border-b border-gray-200 pb-5">
+        <h1 class="text-2xl font-black text-gray-800 tracking-tight flex items-center">
+            <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center mr-3 text-indigo-600">
+                <i class="fas {% if object %}fa-edit{% else %}fa-graduation-cap{% endif %} text-xl"></i>
+            </div>
+            {% if object %}Editar Curso: {{ object.nombre }}{% else %}Crear Nuevo Curso{% endif %}
         </h1>
-        <p class="text-sm text-gray-500 mt-1">Completa la información del curso y sube el listado de estudiantes.</p>
+        <p class="text-sm text-gray-500 mt-2 ml-14">Define los parámetros del curso y carga la nómina de estudiantes.</p>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-        <div class="p-6">
-            <form method="post" enctype="multipart/form-data" id="courseForm">
-                {% csrf_token %}
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+        <form method="post" enctype="multipart/form-data" id="courseForm" class="p-8">
+            {% csrf_token %}
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="md:col-span-2">
-                        {{ form.nombre|as_crispy_field }}
-                        {{ form.configuracion_certificado }}
+            {% if form.non_field_errors %}
+            <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500"></i>
                     </div>
-                    <div class="md:col-span-2">
-                        {{ form.descripcion|as_crispy_field }}
-                    </div>
-                    <div class="md:col-span-2">
-                        {{ form.responsable|as_crispy_field }}
-                    </div>
-                    <div>
-                        {{ form.fecha_inicio|as_crispy_field }}
-                    </div>
-                    <div>
-                        {{ form.fecha_fin|as_crispy_field }}
-                    </div>
-                    <div class="md:col-span-2">
-                        <div class="p-4 bg-blue-50 border border-blue-100 rounded-md mb-4">
-                            <h4 class="text-sm font-semibold text-blue-800 flex items-center mb-2">
-                                <i class="fas fa-info-circle mr-2"></i> Formato de Excel Sugerido
-                            </h4>
-                            <p class="text-xs text-blue-700 leading-relaxed mb-2">
-                                Para una importación exitosa, asegúrate de que tu archivo Excel tenga las siguientes
-                                columnas (el nombre puede variar ligeramente):
-                            </p>
-                            <ul class="text-xs text-blue-700 list-disc ml-5 space-y-1">
-                                <li><strong>Nombres</strong> (o Nombre Completo)</li>
-                                <li><strong>Cedula</strong> (o Cédula, DNI)</li>
-                                <li><strong>Correo</strong> (o Email, Correo Electrónico)</li>
-                            </ul>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Errores en el formulario</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            {{ form.non_field_errors }}
                         </div>
-                        {{ form.archivo_estudiantes|as_crispy_field }}
                     </div>
-                    <div class="md:col-span-2">
-                        {{ form.plantilla_certificado|as_crispy_field }}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                
+                <!-- Columna Izquierda: Información Principal -->
+                <div class="md:col-span-8 space-y-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2 mb-4">Información General</h3>
+                    
+                    <div class="grid grid-cols-1 gap-6">
+                        <div>
+                            {{ form.nombre|as_crispy_field }}
+                        </div>
+                        <div>
+                            {{ form.descripcion|as_crispy_field }}
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {{ form.responsable|as_crispy_field }}
+                            <!-- Espacio para futuro campo -->
+                        </div>
                     </div>
-                    {% if object and object.pk and object.plantilla_certificado %}
-                    <div class="md:col-span-2 mt-4 pt-4 border-t border-gray-100">
-                        <div class="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
-                            <div class="flex items-center">
-                                <div class="p-3 bg-indigo-100 rounded-lg mr-4">
-                                    <i class="fas fa-drafting-compass text-indigo-600"></i>
+
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-2 mb-4 mt-8">Configuración del Certificado</h3>
+                    
+                    <!-- Campo oculto para el formulario real -->
+                    <input type="hidden" name="plantilla_certificado" id="id_plantilla_certificado" value="{{ form.plantilla_certificado.value|default:'' }}">
+                    
+                    <!-- Selector Visual de Plantilla -->
+                    <div class="space-y-4">
+                        <label class="block text-sm font-bold text-gray-700">Plantilla de Diseño</label>
+                        
+                        <!-- Área de Previsualización Seleccionada -->
+                        <div id="plantilla-preview-container" class="relative group cursor-pointer border-2 border-dashed border-gray-300 rounded-xl p-2 hover:border-indigo-400 transition-all duration-300 {% if not form.plantilla_certificado.value %}bg-gray-50{% else %}bg-white border-solid border-gray-200{% endif %}">
+                            
+                            <!-- Estado: Sin Selección -->
+                            <div id="no-selection-state" class="flex flex-col items-center justify-center py-8 {% if form.plantilla_certificado.value %}hidden{% endif %}">
+                                <div class="w-16 h-16 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mb-3 transition-transform">
+                                    <i class="fas fa-image text-2xl"></i>
                                 </div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-indigo-900">Configuración Visual Activa</h4>
-                                    <p class="text-xs text-indigo-600 mt-0.5">La posición del certificado ya está definida. ¿Deseas reajustarla?</p>
-                                </div>
+                                <p class="text-sm font-medium text-gray-600">Ninguna plantilla seleccionada</p>
+                                <button type="button" onclick="openModal('plantillaModal')" class="mt-3 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors">
+                                    SELECCIONAR PLANTILLA
+                                </button>
                             </div>
-                            <a href="{% url 'curso:config' object.pk %}"
-                                class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-md shadow-indigo-100">
-                                Ir al Configurador
-                            </a>
+
+                            <!-- Estado: Seleccionado -->
+                            <div id="selection-state" class="relative overflow-hidden rounded-lg aspect-video {% if not form.plantilla_certificado.value %}hidden{% endif %}">
+                                <img id="preview-image" src="{{ form.instance.plantilla_certificado.archivo.url|default:'' }}" alt="Plantilla Seleccionada" class="w-full h-full object-cover object-top">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
+                                    <div class="w-full text-white">
+                                        <p id="preview-name" class="font-bold text-lg truncate">{{ form.instance.plantilla_certificado.nombre|default:'Nombre de la Plantilla' }}</p>
+                                        <p class="text-xs opacity-80">Clic para cambiar</p>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="openModal('plantillaModal')" class="absolute top-2 right-2 p-2 bg-white/90 text-gray-700 rounded-full shadow-md hover:bg-white transition-colors">
+                                    <i class="fas fa-pen text-xs"></i>
+                                </button>
+                            </div>
                         </div>
+
+                        <!-- Configuración Adicional (Oculta si es necesario) -->
+                        <div class="hidden">
+                           {{ form.configuracion_certificado }}
+                        </div>
+                    </div>
+
+                    <!-- Botón para Editar Diseño Visual (Solo si hay una plantilla seleccionada y guardada) -->
+                    {% if object and object.pk and object.plantilla_certificado %}
+                    <div class="mt-2 flex justify-end">
+                        <a href="{% url 'curso:config' object.pk %}" class="inline-flex items-center px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm font-bold hover:bg-amber-100 transition-colors shadow-sm">
+                            <i class="fas fa-paint-brush mr-2"></i> Configurar Posiciones y Textos
+                        </a>
                     </div>
                     {% endif %}
+
+                    <!-- MODAL DE SELECCIÓN DE PLANTILLA -->
+                    <div id="plantillaModal" class="fixed inset-0 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                        <!-- Backdrop -->
+                        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('plantillaModal')"></div>
+
+                        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                                <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl border border-gray-100">
+                                    
+                                    <!-- Modal Header -->
+                                    <div class="bg-white px-4 py-4 sm:px-6 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+                                        <div>
+                                            <h3 class="text-lg font-black text-gray-900 leading-6" id="modal-title">Seleccionar Diseño</h3>
+                                            <p class="text-sm text-gray-500 mt-1">Elige una plantilla base para el certificado.</p>
+                                        </div>
+                                        <button type="button" onclick="closeModal('plantillaModal')" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Modal Body (Grid de Plantillas) -->
+                                    <div class="bg-gray-50 px-4 py-6 sm:px-6 max-h-[70vh] overflow-y-auto">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {% for plantilla in plantillas_disponibles %}
+                                            <div onclick="selectPlantilla('{{ plantilla.id }}', '{{ plantilla.nombre }}', '{{ plantilla.archivo.url }}')" 
+                                                 class="group relative cursor-pointer rounded-xl bg-white shadow-sm border-2 border-transparent hover:border-indigo-500 hover:shadow-md transition-all duration-300 overflow-hidden">
+                                                
+                                                <!-- Imagen -->
+                                                <div class="aspect-video w-full overflow-hidden bg-gray-200 relative">
+                                                    {% if plantilla.archivo.url|slice:"-4:" == ".pdf" %}
+                                                        <div class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+                                                            <i class="fas fa-file-pdf text-4xl mb-2"></i>
+                                                            <span class="text-xs font-bold uppercase">Vista previa no disponible</span>
+                                                        </div>
+                                                    {% else %}
+                                                        <img src="{{ plantilla.archivo.url }}" alt="{{ plantilla.nombre }}" class="w-full h-full object-cover transition-transform duration-500">
+                                                    {% endif %}
+                                                    
+                                                    <!-- Overlay Hover -->
+                                                    <div class="absolute inset-0 bg-indigo-900/0 group-hover:bg-indigo-900/5 transition-colors duration-300 flex items-center justify-center">
+                                                        <span class="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white text-indigo-600 font-bold rounded-full shadow-sm text-xs transition-all">
+                                                            Seleccionar
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Info -->
+                                                <div class="p-4">
+                                                    <h4 class="font-bold text-gray-800 text-sm truncate">{{ plantilla.nombre }}</h4>
+                                                    <p class="text-xs text-gray-500 mt-1 line-clamp-2">{{ plantilla.descripcion|default:"Sin descripción" }}</p>
+                                                </div>
+
+                                                <!-- Check activo si coincide (JS lo maneja visualmente mejor, pero podemos añadir lógica si queremos) -->
+                                                <div id="check-{{ plantilla.id }}" class="absolute top-2 right-2 w-6 h-6 bg-green-500 rounded-full text-white flex items-center justify-center shadow-md transform scale-0 transition-transform check-indicator">
+                                                    <i class="fas fa-check text-xs"></i>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Modal Footer -->
+                                    <div class="bg-white px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-100">
+                                        <button type="button" onclick="closeModal('plantillaModal')" class="inline-flex w-full justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancelar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mt-8 pt-6 border-t border-gray-100 flex items-center justify-end space-x-3">
-                    <a href="{% url 'curso:list' %}"
-                        class="px-4 py-2 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors">
-                        Cancelar
-                    </a>
-                    <button type="submit" id="submitBtn"
-                        class="px-6 py-2 bg-indigo-600 border border-transparent rounded shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors flex items-center">
-                        <i class="fas fa-save mr-2"></i>
-                        <span id="btnText">Guardar Curso</span>
-                        <span id="spinner" class="hidden ml-2">
-                            <i class="fas fa-spinner fa-spin"></i> Procesando...
-                        </span>
-                    </button>
+                <!-- Columna Derecha: Fechas y Archivos -->
+                <div class="md:col-span-4 space-y-6">
+                    <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4"><i class="far fa-calendar-alt mr-2"></i> Duración</h3>
+                        <div class="space-y-4">
+                            {{ form.fecha_inicio|as_crispy_field }}
+                            {{ form.fecha_fin|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                        <h3 class="text-xs font-bold text-blue-800 uppercase tracking-wider mb-4"><i class="fas fa-users mr-2"></i> Nómina Estudiantes</h3>
+                        
+                        <!-- Drag & Drop Area -->
+                        <div id="drop-zone" class="relative border-2 border-dashed border-blue-300 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors cursor-pointer bg-white">
+                            <i class="fas fa-file-excel text-3xl text-green-500 mb-3"></i>
+                            <p class="text-sm font-medium text-blue-900 mb-1">Arrastra tu Excel aquí</p>
+                            <p class="text-xs text-blue-600 mb-3">o haz clic para buscar</p>
+                            <span id="file-name" class="text-xs font-bold text-gray-600 truncate max-w-full hidden">archivo.xlsx</span>
+                            
+                            <!-- El input real (oculto visualmente pero funcional) -->
+                            <input type="file" name="archivo_estudiantes" id="id_archivo_estudiantes" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".xlsx,.xls,.csv">
+                        </div>
+                        
+                        {% if form.archivo_estudiantes.errors %}
+                        <p class="text-xs text-red-600 mt-2 font-medium">
+                            {{ form.archivo_estudiantes.errors.0 }}
+                        </p>
+                        {% endif %}
+
+                        <div class="mt-4 text-[10px] text-blue-700">
+                            <strong>Columnas requeridas:</strong> <br>
+                            Nombres, Cedula, Correo
+                        </div>
+                    </div>
                 </div>
-            </form>
-        </div>
+
+            </div>
+
+            <div class="mt-10 pt-6 border-t border-gray-100 flex items-center justify-end space-x-3">
+                <a href="{% url 'curso:list' %}"
+                    class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 focus:outline-none transition-colors">
+                    CANCELAR
+                </a>
+                <button type="submit" id="submitBtn"
+                    class="px-8 py-2.5 bg-indigo-600 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors flex items-center">
+                    <i class="fas fa-save mr-2"></i>
+                    <span id="btnText">GUARDAR CURSO</span>
+                    <span id="spinner" class="hidden ml-2">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-    document.getElementById('courseForm').addEventListener('submit', function (e) {
-        const btn = document.getElementById('submitBtn');
-        const text = document.getElementById('btnText');
-        const spinner = document.getElementById('spinner');
 
-        // Deshabilitar para evitar doble envío
-        btn.disabled = true;
-        btn.classList.add('opacity-75', 'cursor-not-allowed');
-        text.classList.add('hidden');
-        spinner.classList.remove('hidden');
+{% block extra_js %}
+<!-- LOADING OVERLAY -->
+<div id="full-screen-loader" class="fixed inset-0 z-[9999] hidden">
+    <div class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity"></div>
+    <div class="relative flex min-h-screen items-center justify-center p-4">
+        <div class="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white p-8 text-left align-middle shadow-xl transition-all">
+            <div class="flex flex-col items-center justify-center text-center">
+                <div class="mb-6 relative">
+                    <div class="w-16 h-16 border-4 border-indigo-100 rounded-full animate-spin"></div>
+                    <div class="w-16 h-16 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
+                </div>
+                <h3 id="loader-title" class="text-lg font-black text-gray-900 leading-6 mb-2">Procesando...</h3>
+                <p id="loader-desc" class="text-sm text-gray-500">Guardando cambios en el sistema.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Drag & Drop Logic
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('id_archivo_estudiantes');
+        const fileNameDisplay = document.getElementById('file-name');
+        const icon = dropZone.querySelector('.fa-file-excel');
+        const text = dropZone.querySelector('p');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('bg-blue-100', 'border-blue-500');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('bg-blue-100', 'border-blue-500');
+        }
+
+        // Handle Drop
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        // Handle Click/Change
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                
+                // VALIDATION: Excel Only
+                const validExts = ['.xlsx', '.xls', '.csv'];
+                const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                
+                if (!validExts.includes(fileExt)) {
+                    alert('Error: Solo se permiten archivos de Excel (.xlsx, .xls) o CSV.');
+                    fileInput.value = ''; // Reset
+                    return;
+                }
+
+                fileInput.files = files; // Assign to input if dropped
+                
+                // Update UI
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.remove('hidden');
+                icon.classList.remove('text-green-500');
+                icon.classList.add('text-indigo-600');
+                
+                // Hide default text slightly
+                dropZone.querySelector('p').classList.add('hidden');
+                dropZone.querySelector('.text-xs').classList.add('hidden');
+            }
+        }
+
+        // Form Submit Animation
+        document.getElementById('courseForm').addEventListener('submit', function (e) {
+            // Check validity (HTML5)
+            if (!this.checkValidity()) return;
+
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('full-screen-loader');
+            const loaderTitle = document.getElementById('loader-title');
+            const loaderDesc = document.getElementById('loader-desc');
+            const hasFile = fileInput.files.length > 0 || fileInput.value !== '';
+
+            // Update Loader Text based on context
+            if (hasFile) {
+                loaderTitle.textContent = 'Importando Nómina';
+                loaderDesc.textContent = 'Leyendo Excel y registrando estudiantes... Por favor espere.';
+            } else {
+                loaderTitle.textContent = 'Guardando Curso';
+                loaderDesc.textContent = 'Actualizando información...';
+            }
+
+            // Show Overlay
+            loader.classList.remove('hidden');
+            
+            // Disable button visually
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+        });
     });
+</script>
+
+<script>
+    // === PLANTILLA MODAL LOGIC ===
+    function openModal(modalId) {
+        document.getElementById(modalId).classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function selectPlantilla(id, nombre, url) {
+        // Actualizar input oculto
+        const input = document.getElementById('id_plantilla_certificado');
+        input.value = id;
+        
+        // Actualizar preview visual
+        const img = document.getElementById('preview-image');
+        const name = document.getElementById('preview-name');
+        
+        if(img) img.src = url;
+        if(name) name.textContent = nombre;
+        
+        // Cambiar visibilidad de estados
+        document.getElementById('no-selection-state').classList.add('hidden');
+        document.getElementById('selection-state').classList.remove('hidden');
+        
+        // Cerrar modal
+        closeModal('plantillaModal');
+        
+        // Visual Check Update
+        document.querySelectorAll('.check-indicator').forEach(el => el.classList.add('scale-0'));
+        const check = document.getElementById('check-' + id);
+        if(check) check.classList.remove('scale-0');
+    }
 </script>
 {% endblock %}

@@ -5,33 +5,62 @@
 {% block title %}Editar Estudiante{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
-    <div class="mb-6 flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-800">Editar Estudiante</h1>
-            <p class="text-sm text-gray-500 mt-1">Modifique los datos del estudiante para este curso.</p>
+<div class="max-w-2xl mx-auto">
+    <div class="mb-8 border-b border-gray-200 pb-5 text-center">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-600 mb-4">
+            <i class="fas fa-user-graduate text-xl"></i>
         </div>
-        <a href="{% url 'curso:estudiantes' object.curso.pk %}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-            <i class="fas fa-arrow-left mr-1"></i> Volver a la lista
-        </a>
+        <h1 class="text-2xl font-black text-gray-800 tracking-tight">Editar Estudiante</h1>
+        <p class="text-sm text-gray-500 mt-2">Modifica los datos personales y de contacto.</p>
     </div>
 
-    <div class="bg-white shadow-sm rounded-lg border border-gray-200">
-        <form method="post" class="p-6">
-            {% csrf_token %}
-            <div class="space-y-4">
-                {{ form|crispy }}
-            </div>
-            
-            <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end space-x-3">
-                <a href="{% url 'curso:estudiantes' object.curso.pk %}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                    Cancelar
-                </a>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none transition">
-                    Guardar Cambios
-                </button>
-            </div>
-        </form>
+    <div class="bg-white shadow-lg shadow-green-50/50 rounded-xl border border-gray-200 overflow-hidden relative">
+         <!-- Decoration -->
+         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500"></div>
+
+         <div class="p-8">
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md text-sm text-red-700">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+                
+                <div class="space-y-6">
+                    <!-- Sección Datos -->
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Información Personal</h3>
+                        {{ form.nombre_completo|as_crispy_field }}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            {{ form.cedula|as_crispy_field }}
+                        </div>
+                        <div>
+                            {{ form.correo|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-10 pt-6 border-t border-gray-100 flex justify-end space-x-3">
+                    {% if object %}
+                    <a href="{% url 'curso:estudiantes' object.curso.pk %}" class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors">
+                        CANCELAR
+                    </a>
+                    {% else %}
+                    <a href="{% url 'curso:estudiantes' view.kwargs.pk %}" class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors">
+                        CANCELAR
+                    </a>
+                    {% endif %}
+                    <button type="submit" class="px-8 py-2.5 bg-green-600 border border-transparent rounded-lg shadow-lg shadow-green-200 text-sm font-bold text-white hover:bg-green-700 hover:scale-[1.02] active:scale-95 focus:outline-none transition-all">
+                        GUARDAR CAMBIOS
+                    </button>
+                </div>
+            </form>
+         </div>
     </div>
 </div>
 {% endblock %}

@@ -85,18 +85,127 @@
                     {% endif %}
                 </div>
 
-                <!-- Selección de Curso -->
+                <!-- Selección de Curso (Visual) -->
                 <div>
-                    <label for="{{ form.course.id_for_label }}" class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                        {{ form.course.label }} <span class="text-red-500">*</span>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                        Curso Destino <span class="text-red-500">*</span>
                     </label>
-                    {{ form.course }}
+                    
+                    <!-- Select original oculto para compatibilidad con Django Form -->
+                    <div class="hidden">
+                        {{ form.course }}
+                    </div>
+                    
+                    <!-- Componente Visual de Selección -->
+                    <div id="course-selector-container" class="relative group cursor-pointer border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-indigo-400 transition-all duration-300 bg-gray-50">
+                        
+                        <!-- Estado: Sin Selección -->
+                        <div id="no-course-state" class="flex flex-col items-center justify-center py-6 {% if form.course.value %}hidden{% endif %}">
+                            <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2">
+                                <i class="fas fa-graduation-cap text-xl"></i>
+                            </div>
+                            <p class="text-sm font-medium text-gray-600">Ningún curso seleccionado</p>
+                            <button type="button" onclick="openModal('courseModal')" class="mt-3 px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded shadow-sm hover:bg-blue-700 transition-colors">
+                                SELECCIONAR CURSO
+                            </button>
+                        </div>
+
+                        <!-- Estado: Curso Seleccionado -->
+                        <div id="course-selected-state" class="{% if not form.course.value %}hidden{% endif %}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <div>
+                                        <h3 id="selected-course-name" class="font-bold text-gray-800 text-sm">Nombre del Curso</h3>
+                                        <p class="text-xs text-gray-500"><span id="selected-course-count">0</span> estudiantes inscritos</p>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="openModal('courseModal')" class="text-xs text-blue-600 font-medium hover:text-blue-800 underline">
+                                    Cambiar
+                                </button>
+                            </div>
+                            
+                            <!-- Preview del PDF (Si existe) -->
+                            <div id="pdf-preview-link" class="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-center justify-between hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-file-pdf text-red-500"></i>
+                                    <span class="text-xs font-medium text-red-800">Muestra de Certificado Generado</span>
+                                </div>
+                                <a href="#" target="_blank" id="btn-view-pdf" class="text-xs bg-white border border-red-200 text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                                    <i class="fas fa-eye mr-1"></i> Ver PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                     {% if form.course.errors %}
                         <p class="mt-1 text-xs text-red-600 flex items-center">
                             <i class="fas fa-circle-exclamation mr-1"></i> {{ form.course.errors.0 }}
                         </p>
                     {% endif %}
-                    <p class="mt-1 text-xs text-gray-400">Se enviará a todos los estudiantes inscritos en este curso.</p>
+                    <p class="mt-1 text-xs text-gray-400">Solo se permiten cursos con estudiantes y certificados generados.</p>
+                </div>
+
+                <!-- MODAL DE SELECCIÓN DE CURSO -->
+                <div id="courseModal" class="fixed inset-0 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('courseModal')"></div>
+                    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                            <div class="relative transform overflow-hidden rounded-xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-gray-100">
+                                
+                                <!-- Header -->
+                                <div class="bg-white px-4 py-3 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+                                    <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wide">Seleccionar Curso</h3>
+                                    <button type="button" onclick="closeModal('courseModal')" class="text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Lista de Cursos -->
+                                <div class="max-h-[60vh] overflow-y-auto p-4 bg-gray-50 space-y-3">
+                                    {% for curso in available_courses %}
+                                    <div class="relative bg-white border rounded-lg p-4 transition-all duration-200 
+                                                {% if curso.tiene_certificados %}hover:border-blue-500 hover:shadow-md cursor-pointer{% else %}opacity-60 border-gray-100 cursor-not-allowed grayscale{% endif %}"
+                                         {% if curso.tiene_certificados %}onclick="selectCourse('{{ curso.id }}', '{{ curso.nombre }}', '{{ curso.estudiantes_count }}', '{{ curso.preview_url|default:'' }}')"{% endif %}>
+                                        
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex items-start gap-3">
+                                                <div class="mt-1 w-8 h-8 rounded bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                                    {{ curso.nombre|slice:":1" }}
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-sm font-bold text-gray-800">{{ curso.nombre }}</h4>
+                                                    <p class="text-xs text-gray-500 mt-0.5">{{ curso.estudiantes_count }} Estudiantes registrados</p>
+                                                    
+                                                    {% if not curso.tiene_certificados %}
+                                                    <span class="inline-flex items-center mt-2 px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">
+                                                        <i class="fas fa-ban mr-1"></i> Sin certificados generados
+                                                    </span>
+                                                    {% else %}
+                                                    <span class="inline-flex items-center mt-2 px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+                                                        <i class="fas fa-check-circle mr-1"></i> Listo para enviar
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+
+                                            {% if curso.tiene_certificados and curso.preview_url %}
+                                            <div class="flex flex-col items-end gap-2" onclick="event.stopPropagation()">
+                                                <a href="{{ curso.preview_url }}" target="_blank" class="text-[10px] font-bold text-gray-500 hover:text-blue-600 border border-gray-200 px-2 py-1 rounded bg-gray-50 hover:bg-white transition-colors">
+                                                    <i class="far fa-file-pdf mr-1"></i> Ver Muestra
+                                                </a>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <div class="text-center py-8 text-gray-500 text-sm">No hay cursos disponibles.</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
