@@ -6,7 +6,7 @@
 {% block content %}
 <div class="min-h-screen bg-gray-100 flex items-center py-4 px-3 sm:px-6">
     <div class="w-full max-w-6xl mx-auto">
-        
+
         <!-- Header Compacto -->
         <div class="bg-white border-b-2 border-blue-700 mb-3 px-4 py-2 rounded-t-lg shadow-sm">
             <div class="flex items-center justify-between">
@@ -23,10 +23,10 @@
         <!-- Contenedor Principal Grid -->
         <div class="bg-white shadow-lg rounded-b-lg overflow-hidden">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
-                
+
                 <!-- Columna Izquierda: Datos -->
                 <div class="p-4 space-y-3">
-                    
+
                     <!-- Datos del Estudiante -->
                     <div class="bg-gray-50 border border-gray-200 rounded p-3">
                         <div class="flex items-start gap-2">
@@ -54,36 +54,51 @@
                     <!-- Acciones -->
                     <div class="pt-2 space-y-2">
                         {% if certificado and certificado.archivo_generado %}
-                            <a href="{% url 'curso:certificate_download' certificado.pk %}" 
-                               class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm">
-                                <i class="fas fa-download mr-2 text-xs"></i> Descargar Certificado
-                            </a>
+                        {% with status=certificado.status_archivo %}
+                        {% if status.exists %}
+                        <a href="{% url 'curso:certificate_download' certificado.pk %}"
+                            class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm">
+                            <i class="fas fa-download mr-2 text-xs"></i> Descargar Certificado
+                        </a>
                         {% else %}
-                           <div class="bg-yellow-50 border border-yellow-300 rounded p-3 flex gap-2">
-                               <i class="fas fa-clock text-yellow-600 text-sm mt-0.5"></i>
-                               <p class="text-xs text-yellow-800 leading-tight">
-                                   Certificado en proceso de generación. Intente más tarde.
-                               </p>
-                           </div>
+                        <div class="bg-red-50 border border-red-200 rounded p-3 flex gap-2">
+                            <i class="fas fa-exclamation-triangle text-red-600 text-sm mt-0.5"></i>
+                            <p class="text-[11px] text-red-800 leading-tight">
+                                <span class="font-bold">Archivo no disponible:</span> El certificado existe pero el
+                                archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.
+                            </p>
+                        </div>
                         {% endif %}
-                        
-                        <a href="{% url 'curso:public_portal' %}" 
-                           class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-colors">
+                        {% endwith %}
+                        {% else %}
+                        <div class="bg-yellow-50 border border-yellow-300 rounded p-3 flex gap-2">
+                            <i class="fas fa-clock text-yellow-600 text-sm mt-0.5"></i>
+                            <p class="text-xs text-yellow-800 leading-tight">
+                                Certificado en proceso de generación. Intente más tarde.
+                            </p>
+                        </div>
+                        {% endif %}
+
+                        <a href="{% url 'curso:public_portal' %}"
+                            class="w-full flex items-center justify-center px-4 py-2.5 text-sm font-semibold rounded text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-colors">
                             <i class="fas fa-search mr-2 text-xs"></i> Nueva Búsqueda
                         </a>
                     </div>
                 </div>
 
-                <!-- Columna Derecha: Previsualización PDF -->
-                {% if certificado and certificado.archivo_generado %}
+                <!-- Columna Derecha: Previsualización PDF o Mensaje de Error -->
                 <div class="p-4 bg-gray-50 flex flex-col">
+                    {% if certificado and certificado.archivo_generado %}
+                    {% if archivo_existe %}
                     <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-2">
                         <i class="fas fa-file-pdf text-red-500"></i> Vista Previa
                     </h4>
-                    
+
                     <!-- Contenedor del Visor -->
-                    <div id="pdf-container" class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden relative flex-1 flex items-center justify-center" style="min-height: 400px; max-height: calc(100vh - 200px);">
-                        
+                    <div id="pdf-container"
+                        class="bg-white rounded border border-gray-300 shadow-sm overflow-hidden relative flex-1 flex items-center justify-center"
+                        style="min-height: 400px; max-height: calc(100vh - 200px);">
+
                         <!-- Loading Spinner -->
                         <div id="pdf-loading" class="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
                             <div class="text-center">
@@ -94,88 +109,96 @@
 
                         <!-- Canvas para renderizar el PDF -->
                         <canvas id="pdf-render" class="max-w-full h-auto"></canvas>
-                        
-                        <!-- Botón flotante mobile -->
+
+                        <!-- Botón flotante mobile (Usa la vista de descarga protegida) -->
                         <div class="absolute bottom-2 right-2 lg:hidden">
-                            <a href="{{ certificado.archivo_generado.url }}" download class="bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center" style="width: 40px; height: 40px;">
+                            <a href="{% url 'curso:certificate_download' certificado.pk %}"
+                                class="bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center"
+                                style="width: 40px; height: 40px;">
                                 <i class="fas fa-download text-sm"></i>
                             </a>
                         </div>
                     </div>
-                </div>
 
-                <!-- PDF.js Library -->
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-                <script>
-                    // Configurar worker
-                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    <!-- Script de Renderizado -->
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+                    <script>
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        const url = '{{ certificado.archivo_generado.url }}';
+                        const loadingTask = pdfjsLib.getDocument(url);
 
-                    const url = '{{ certificado.archivo_generado.url }}';
-                    const loadingTask = pdfjsLib.getDocument(url);
-                    
-                    loadingTask.promise.then(pdf => {
-                        pdf.getPage(1).then(page => {
-                            const canvas = document.getElementById('pdf-render');
-                            const ctx = canvas.getContext('2d');
-                            const loading = document.getElementById('pdf-loading');
-                            const container = document.getElementById('pdf-container');
-                            
-                            // --- RESPONSIVE SCALING ---
-                            // Obtener ancho del contenedor (o window si es muy pequeño)
-                            const containerWidth = container.clientWidth - 32; // -padding
-                            const unscaledViewport = page.getViewport({scale: 1});
-                            
-                            // Calcular escala para que quepa en el ancho
-                            let scale = containerWidth / unscaledViewport.width;
-                            
-                            // Limite de calidad (no escalar infinito en desktop)
-                            if (scale > 1.5) scale = 1.5; 
-                            
-                            const viewport = page.getViewport({scale: scale});
-
-                            canvas.height = viewport.height;
-                            canvas.width = viewport.width;
-
-                            const renderContext = {
-                                canvasContext: ctx,
-                                viewport: viewport
-                            };
-                            
-                            const renderTask = page.render(renderContext);
-                            renderTask.promise.then(() => {
-                                loading.classList.add('hidden');
-                                container.style.minHeight = 'auto'; // Ajustar altura
+                        loadingTask.promise.then(pdf => {
+                            pdf.getPage(1).then(page => {
+                                const canvas = document.getElementById('pdf-render');
+                                const ctx = canvas.getContext('2d');
+                                const loading = document.getElementById('pdf-loading');
+                                const container = document.getElementById('pdf-container');
+                                const containerWidth = container.clientWidth - 32;
+                                const unscaledViewport = page.getViewport({ scale: 1 });
+                                let scale = containerWidth / unscaledViewport.width;
+                                if (scale > 1.5) scale = 1.5;
+                                const viewport = page.getViewport({ scale: scale });
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+                                const renderContext = { canvasContext: ctx, viewport: viewport };
+                                const renderTask = page.render(renderContext);
+                                renderTask.promise.then(() => {
+                                    loading.classList.add('hidden');
+                                    container.style.minHeight = 'auto';
+                                });
                             });
+                        }).catch(err => {
+                            document.getElementById('pdf-loading').innerHTML = `
+                                            <div class="text-red-500 px-4 text-center py-10">
+                                                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                                                <p class="text-sm font-bold">Archivo no disponible</p>
+                                                <p class="text-[10px] text-gray-500 max-w-xs mx-auto">El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.</p>
+                                                <div class="mt-4">
+                                                    <a href="{% url 'curso:public_portal' %}" class="text-blue-600 underline text-xs font-bold uppercase tracking-wider">Nueva Búsqueda</a>
+                                                </div>
+                                            </div>`;
                         });
-                    }, reason => {
-                        console.error('Error cargando PDF:', reason);
-                        document.getElementById('pdf-loading').innerHTML = `
-                            <div class="text-red-500 px-4 text-center py-10">
-                                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                                <p class="mb-2 text-sm">Vista previa no disponible.</p>
-                                <a href="${url}" class="text-blue-600 underline text-xs font-bold">Descargar PDF</a>
-                            </div>
-                        `;
-                    });
-                    
-                    // Recargar al cambiar tamaño de ventana (opcional, simple debounce)
-                    let resizeTimeout;
-                    window.addEventListener('resize', () => {
-                        clearTimeout(resizeTimeout);
-                        resizeTimeout = setTimeout(() => {
-                            // Podríamos reimplementar renderizado aquí si fuera crítico
-                        }, 200);
-                    });
-                </script>
-                {% endif %}
+                    </script>
+                    {% else %}
+                    <!-- Caso: Registro existe pero archivo físico no -->
+                    <div
+                        class="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white rounded border border-dashed border-gray-300">
+                        <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-file-circle-exclamation text-red-400 text-2xl"></i>
+                        </div>
+                        <h5 class="text-sm font-bold text-gray-800 uppercase tracking-tight">Archivo no disponible</h5>
+                        <p class="text-xs text-gray-500 mt-2 max-w-xs">
+                            El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por
+                            favor, contacte a soporte.
+                        </p>
+                        <div class="mt-4 p-2 bg-red-50 rounded text-[9px] text-red-700 font-mono">
+                            Error: PHYSICAL_FILE_MISSING
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <!-- Caso: Aún no se ha generado el archivo -->
+                    <div
+                        class="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white rounded border border-dashed border-gray-300">
+                        <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-sync fa-spin text-blue-400 text-2xl"></i>
+                        </div>
+                        <h5 class="text-sm font-bold text-gray-800">Generación en Curso</h5>
+                        <p class="text-xs text-gray-500 mt-2 max-w-xs">
+                            Su certificado está siendo procesado por el sistema. Por favor, actualice esta página en
+                            unos momentos.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            
+
             <!-- Footer -->
             <div class="bg-gray-100 border-t border-gray-200 px-4 py-2">
-                 <p class="text-xs text-center text-gray-500">
-                     <i class="fas fa-university text-gray-400 mr-1"></i>
-                     Universidad Estatal de Milagro - Documento Oficial
-                 </p>
+                <p class="text-xs text-center text-gray-500">
+                    <i class="fas fa-university text-gray-400 mr-1"></i>
+                    Universidad Estatal de Milagro - Documento Oficial
+                </p>
             </div>
         </div>
     </div>

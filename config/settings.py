@@ -166,6 +166,9 @@ LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 
+# URL del sitio para correos electrónicos
+SITE_URL = env('SITE_URL', default='http://localhost:8000')
+
 
 # Internacionalización
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -190,7 +193,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Configuración de archivos de medios
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = env('MEDIA_ROOT_PATH', default=os.path.join(BASE_DIR, 'media'))
 
 # Configuración de cache para archivos estáticos y media
 STATIC_FILE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días en segundos

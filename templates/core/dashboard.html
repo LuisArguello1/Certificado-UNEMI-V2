@@ -6,6 +6,25 @@
 <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 md:p-6">
     <div class="max-w-[1920px] mx-auto space-y-4">
         
+        <!-- SECCIÓN 0: Alerta de Almacenamiento NAS -->
+        {% if not storage_status.is_online %}
+        <div class="backdrop-blur-md bg-red-50/90 border-l-4 border-red-500 p-4 shadow-sm mb-6 animate-pulse">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-server text-red-600 text-lg"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-sm font-bold text-red-800 uppercase tracking-tight">ALERTA TÉCNICA: ALMACENAMIENTO NAS NO DISPONIBLE</h3>
+                    <div class="mt-2 text-xs text-red-700 space-y-1 font-mono">
+                        <p><span class="font-bold">Error:</span> {{ storage_status.message }}</p>
+                        <p><span class="font-bold">Impacto:</span> No se pueden generar certificados, subir plantillas ni procesar Excels de estudiantes.</p>
+                        <p><span class="font-bold">Acción:</span> Verifique la conexión de red con el NAS Synology y que la unidad de red esté correctamente montada.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- SECCIÓN 1: Métricas Principales con Gráficos -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             

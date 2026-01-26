@@ -59,9 +59,8 @@ class EmailCampaignService:
             # Mejor opción: Guardar solo la base y construir el link completo al enviar, 
             # O construir aquí un link genérico.
             # El requerimiento dice: "btn con un link hacia una pagina del mismo sistema"
-            
-            # Usaremos una ruta placeholder que luego se resolverá correctamente
-            link = reverse('curso:public_portal') # Necesitaremos definir esta URL
+            # Incluimos el curso_id para que el portal abra el modal automáticamente
+            link = f"{reverse('curso:public_portal')}?curso_id={course.id}"
             
             recipient = EmailRecipient(
                 campaign=campaign,

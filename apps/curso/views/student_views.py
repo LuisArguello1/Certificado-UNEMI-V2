@@ -1,3 +1,4 @@
+from django.shortcuts import redirect
 from django.views.generic import TemplateView, View
 from django.shortcuts import render, get_object_or_404
 from django.http import FileResponse, Http404, HttpResponse
@@ -48,10 +49,17 @@ class CertificateSearchView(TemplateView):
             
             certificado = Certificado.objects.filter(estudiante=estudiante).first()
             
+            # Verificar existencia física para el frontend
+            archivo_existe = False
+            if certificado and certificado.archivo_generado:
+                status = certificado.status_archivo
+                archivo_existe = status['exists']
+
             context = {
                 'estudiante': estudiante,
                 'certificado': certificado,
-                'curso': estudiante.curso
+                'curso': estudiante.curso,
+                'archivo_existe': archivo_existe
             }
             return render(request, self.template_name, context)
 
@@ -83,8 +91,31 @@ class CertificateDownloadView(View):
     def get(self, request, pk):
         certificado = get_object_or_404(Certificado, pk=pk)
         
-        if certificado.archivo_generado:
-            response = FileResponse(certificado.archivo_generado, as_attachment=True)
+        # Validación de robustez NAS
+        from apps.core.services.storage_service import StorageService
+        status = StorageService.get_file_status(certificado.archivo_generado)
+        
+        if not status['exists']:
+            messages.error(request, "Archivo no disponible: El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.")
+            return redirect('curso:public_portal')
+
+        try:
+            # Forzar verificación de apertura antes de enviar respuesta
+            file_path = status['path']
+            if not file_path or not os.path.exists(file_path):
+                 raise FileNotFoundError("Archivo no encontrado en la ruta esperada")
+
+            response = FileResponse(open(file_path, 'rb'), as_attachment=True, filename=os.path.basename(file_path))
+            
+            # Incrementar contador de accesos
+            certificado.access_count += 1
+            from django.utils import timezone
+            certificado.last_access = timezone.now()
+            certificado.save(update_fields=['access_count', 'last_access'])
             return response
-        else:
-            raise Http404("El archivo del certificado no está disponible.")
+        except (FileNotFoundError, IOError) as e:
+            messages.error(request, "Archivo no disponible: El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.")
+            return redirect('curso:public_portal')
+        except Exception as e:
+            messages.error(request, "Archivo no disponible: Detectamos un problema técnico al recuperar su documento. Por favor, contacte a soporte.")
+            return redirect('curso:public_portal')

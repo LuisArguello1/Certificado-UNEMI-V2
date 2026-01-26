@@ -34,3 +34,4 @@ if settings.DEBUG:
     ]
     # Servir archivos media en desarrollo
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

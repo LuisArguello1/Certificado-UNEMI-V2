@@ -1,15 +1,54 @@
 from django.db import models
 from django.core.validators import FileExtensionValidator
+from datetime import datetime
+import uuid
+import hashlib
 import os
 
-def certificate_directory_path(instance, filename):
+# =============================================================================
+# UTILIDADES DE STORAGE
+# =============================================================================
+
+def hash_name(seed: str):
     """
-    Genera la ruta de almacenamiento: certificados_generados/<Nombre_Curso>/<filename>
+    Genera un hash SHA-256 corto para anonimizar nombres de archivos.
     """
-    # Sanitize course name
-    course_name = instance.estudiante.curso.nombre
-    safe_course_name = "".join([c if c.isalnum() or c in (' ', '-', '_') else '_' for c in course_name]).strip()
-    return f'certificados_generados/{safe_course_name}/{filename}'
+    raw = f"{seed}-{uuid.uuid4()}".encode()
+    return hashlib.sha256(raw).hexdigest()[:32]
+
+# =============================================================================
+# PATH GENERATORS
+# =============================================================================
+
+def plantilla_path(instance, filename):
+    """
+    Ruta: plantillas/<año>/tpl_<uuid><ext>
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    year = datetime.now().year
+    uid = uuid.uuid4().hex
+    return f'plantillas/{year}/tpl_{uid}{ext}'
+
+def estudiantes_excel_path(instance, filename):
+    """
+    Ruta: cursos/<curso_id>/estudiantes<ext>
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    return f'cursos/{instance.id}/estudiantes{ext}'
+
+def certificado_path(instance, filename):
+    """
+    Ruta: certificados/<curso_id>/<estudiante_id>/<año>/cert_<hash><ext>
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    year = datetime.now().year
+    curso_id = instance.estudiante.curso.id
+    estudiante_id = instance.estudiante.id
+    h = hash_name(f"{curso_id}-{estudiante_id}")
+    return f'certificados/{curso_id}/{estudiante_id}/{year}/cert_{h}{ext}'
+
+# Alias para mantener compatibilidad con migraciones antiguas
+certificate_directory_path = certificado_path
 
 class PlantillaCertificado(models.Model):
     """
@@ -17,7 +56,7 @@ class PlantillaCertificado(models.Model):
     """
     nombre = models.CharField(max_length=200, verbose_name='Nombre de la plantilla')
     archivo = models.FileField(
-        upload_to='plantillas_certificados/',
+        upload_to=plantilla_path,
         validators=[FileExtensionValidator(allowed_extensions=['pdf', 'png', 'jpg', 'jpeg'])],
         verbose_name='Archivo de plantilla'
     )
@@ -32,6 +71,14 @@ class PlantillaCertificado(models.Model):
     def __str__(self):
         return self.nombre
 
+    @property
+    def status_archivo(self):
+        """
+        Retorna el estado real del archivo en el NAS.
+        """
+        from apps.core.services.storage_service import StorageService
+        return StorageService.get_file_status(self.archivo)
+
 class Curso(models.Model):
     """
     Modelo para gestionar los cursos.
@@ -44,7 +91,7 @@ class Curso(models.Model):
     fecha_fin = models.DateField(verbose_name='Fecha de fin', blank=True, null=True)
     
     archivo_estudiantes = models.FileField(
-        upload_to='cursos/estudiantes/',
+        upload_to=estudiantes_excel_path,
         validators=[FileExtensionValidator(allowed_extensions=['xlsx', 'xls'])],
         verbose_name='Archivo de Estudiantes (Excel)',
         help_text='Subir archivo con columnas: Nombres, Cedula, Correo'
@@ -101,6 +148,14 @@ class Curso(models.Model):
     def __str__(self):
         return self.nombre
 
+    @property
+    def status_excel(self):
+        """
+        Retorna el estado real del archivo Excel en el NAS.
+        """
+        from apps.core.services.storage_service import StorageService
+        return StorageService.get_file_status(self.archivo_estudiantes)
+
 class Estudiante(models.Model):
     """
     Modelo para gestionar los estudiantes inscritos en un curso.
@@ -131,13 +186,16 @@ class Estudiante(models.Model):
     def __str__(self):
         return f"{self.nombre_completo} - {self.cedula}"
 
+def generate_verification_code():
+    return uuid.uuid4().hex[:12].upper()
+
 class Certificado(models.Model):
     """
-    Modelo para los certificados generados.
+    Certificados generados por estudiante
     """
     estudiante = models.ForeignKey(
-        Estudiante, 
-        on_delete=models.CASCADE, 
+        Estudiante,
+        on_delete=models.CASCADE,
         related_name='certificados',
         verbose_name='Estudiante'
     )
@@ -148,19 +206,23 @@ class Certificado(models.Model):
         verbose_name='Plantilla utilizada'
     )
     archivo_generado = models.FileField(
-        upload_to=certificate_directory_path,
+        upload_to=certificado_path,
         null=True,
         blank=True,
         verbose_name='Certificado Generado'
     )
     codigo_verificacion = models.CharField(
-        max_length=50, 
-        unique=True, 
-        null=True, 
-        blank=True, 
+        max_length=50,
+        unique=True,
+        default=generate_verification_code,
         verbose_name='Código de Verificación',
         db_index=True
     )
+
+    # Seguridad y auditoría
+    is_public = models.BooleanField(default=False, verbose_name='Acceso público')
+    access_count = models.PositiveIntegerField(default=0, verbose_name='Número de accesos')
+    last_access = models.DateTimeField(null=True, blank=True, verbose_name='Último acceso')
     fecha_generacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de generación')
 
     class Meta:
@@ -170,9 +232,17 @@ class Certificado(models.Model):
         indexes = [
             models.Index(fields=['codigo_verificacion']),
             models.Index(fields=['estudiante']),
-            # Useful if we filter certificates by template often
-            models.Index(fields=['plantilla']), 
+            models.Index(fields=['plantilla']),
         ]
 
     def __str__(self):
         return f"Certificado de {self.estudiante.nombre_completo}"
+
+    @property
+    def status_archivo(self):
+        """
+        Retorna el estado real del archivo en el NAS.
+        """
+        from apps.core.services.storage_service import StorageService
+        return StorageService.get_file_status(self.archivo_generado)
+

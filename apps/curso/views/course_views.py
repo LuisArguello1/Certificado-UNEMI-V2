@@ -25,7 +25,13 @@ class ExcelProcessMixin:
             return
 
         try:
-            file_path = curso.archivo_estudiantes.path
+            from apps.core.services.storage_service import StorageService
+            file_path = StorageService.safe_get_path(curso.archivo_estudiantes)
+            
+            if not file_path:
+                messages.error(self.request, "El archivo de estudiantes no se encuentra en el NAS o el servidor está desconectado.")
+                return
+
             # Leemos sin encabezados inicialmente para buscar la fila de títulos
             df_raw = pd.read_excel(file_path, header=None, dtype=str)
             
@@ -614,8 +620,12 @@ class DescargarCertificadosZipView(ListView):
                     
                     try:
                          # We need full path on disk
-                        zip_file.write(certificado.archivo_generado.path, zip_path)
-                    except ValueError:
+                        from apps.core.services.storage_service import StorageService
+                        cert_path = StorageService.safe_get_path(certificado.archivo_generado)
+                        
+                        if cert_path:
+                            zip_file.write(cert_path, zip_path)
+                    except Exception:
                          # File might be missing on disk even if DB record exists
                         pass
         
@@ -634,11 +644,19 @@ class CertificateImageUploadView(LoginRequiredMixin, View):
         if 'image' not in request.FILES:
             return JsonResponse({'error': 'No image provided'}, status=400)
         
+        # Verificar salud del NAS
+        from apps.core.services.storage_service import StorageService
+        storage_online, message = StorageService.check_storage_health()
+        if not storage_online:
+            return JsonResponse({'error': f"Almacenamiento no disponible: {message}"}, status=503)
+
         image = request.FILES['image']
         fs = FileSystemStorage()
         
-        # Save with unique name to avoid overwrite issues
-        filename = fs.save(f'certificate_assets/{uuid.uuid4()}_{image.name}', image)
-        file_url = fs.url(filename)
-        
-        return JsonResponse({'url': file_url})
+        try:
+            # Save with unique name to avoid overwrite issues
+            filename = fs.save(f'certificate_assets/{uuid.uuid4()}_{image.name}', image)
+            file_url = fs.url(filename)
+            return JsonResponse({'url': file_url})
+        except Exception as e:
+            return JsonResponse({'error': f"Error al guardar archivo en NAS: {str(e)}"}, status=500)

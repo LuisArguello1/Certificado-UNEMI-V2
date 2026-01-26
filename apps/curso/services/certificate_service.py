@@ -99,8 +99,15 @@ class CertificateService:
         img_h = 600
         
         try:
-            # Obtener path absoluto y convertir a URI válido para WeasyPrint (file:///)
-            bg_path_abs = Path(plantilla.archivo.path).resolve()
+            from apps.core.services.storage_service import StorageService
+            # Obtener path absoluto de forma segura desde el NAS
+            bg_path_abs_str = StorageService.safe_get_path(plantilla.archivo)
+            
+            if not bg_path_abs_str:
+                print(f"Error: Plantilla no encontrada físicamente en el NAS: {plantilla.archivo.name}")
+                return None
+                
+            bg_path_abs = Path(bg_path_abs_str).resolve()
             bg_uri = bg_path_abs.as_uri()
             
             with Image.open(bg_path_abs) as img:
@@ -295,8 +302,18 @@ class CertificateService:
         HTML(string=html_string, base_url=str(Path(settings.MEDIA_ROOT))).write_pdf(target=buffer)
         
         # --- SAVING ---
-        filename = f"certificado_{estudiante.cedula}_{curso.id}.pdf"
-        buffer.seek(0)
-        certificado.archivo_generado.save(filename, ContentFile(buffer.read()), save=True)
-        
-        return certificado
+        try:
+            filename = f"certificado_{estudiante.cedula}_{curso.id}.pdf"
+            buffer.seek(0)
+            
+            # Verificar si el directorio existe (aunque Django lo maneja, esto es por robustez extra en NAS)
+            storage_online, _ = StorageService.check_storage_health()
+            if not storage_online:
+                print("Error: NAS fuera de línea durante guardado de PDF")
+                return None
+
+            certificado.archivo_generado.save(filename, ContentFile(buffer.read()), save=True)
+            return certificado
+        except Exception as e:
+            print(f"Error crítico guardando PDF en NAS: {e}")
+            return None

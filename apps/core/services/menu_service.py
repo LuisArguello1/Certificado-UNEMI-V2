@@ -89,7 +89,7 @@ class MenuService:
             'active': 'plantillas' in current_path
         })
         
-        # TODO: Add Curso links here
+        # Navegación del sistema completa
 
         # Sección de Administración (Solo Staff/Superuser)
         if user and (user.is_staff or user.is_superuser):

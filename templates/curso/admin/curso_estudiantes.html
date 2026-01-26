@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="w-full">
-    
+
     <!-- Alertas ERP -->
     {% if not curso.plantilla_certificado or not curso.configuracion_certificado %}
     <div class="mb-4 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-sm shadow-sm">
@@ -13,33 +13,37 @@
             <div class="flex-shrink-0"><i class="fas fa-triangle-exclamation text-amber-500"></i></div>
             <div class="ml-3">
                 <p class="text-xs text-amber-700 font-bold uppercase tracking-wider mb-1">Configuración requerida</p>
-                <p class="text-xs text-amber-700">El certificado no ha sido diseñado aún. <a href="{% url 'curso:config' curso.pk %}" class="underline font-bold hover:text-amber-900">Diseñar ahora</a></p>
+                <p class="text-xs text-amber-700">El certificado no ha sido diseñado aún. <a
+                        href="{% url 'curso:config' curso.pk %}"
+                        class="underline font-bold hover:text-amber-900">Diseñar ahora</a></p>
             </div>
         </div>
     </div>
     {% endif %}
 
     <!-- Header Estilo User List -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-white p-3 border border-gray-200 rounded-sm shadow-sm">
+    <div
+        class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-white p-3 border border-gray-200 rounded-sm shadow-sm">
         <div>
             <h1 class="text-lg font-bold text-gray-800 uppercase tracking-tight">Estudiantes Inscritos</h1>
         </div>
-        
+
         <div class="mt-3 sm:mt-0 flex flex-wrap gap-2">
-            <a href="{% url 'curso:estudiante_add' curso.pk %}" class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-sm shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">
+            <a href="{% url 'curso:estudiante_add' curso.pk %}"
+                class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-sm shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">
                 <i class="fas fa-user-plus mr-1 text-gray-400"></i> Añadir
             </a>
             <form method="post" action="{% url 'curso:generar_todos' curso.pk %}" data-requires-config="true">
                 {% csrf_token %}
-                <button type="submit" 
-                        class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase"
-                        data-has-config="{% if curso.plantilla_certificado and curso.configuracion_certificado %}true{% else %}false{% endif %}">
+                <button type="submit"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase"
+                    data-has-config="{% if curso.plantilla_certificado and curso.configuracion_certificado %}true{% else %}false{% endif %}">
                     <i class="fas fa-bolt-lightning mr-1"></i> Generar
                 </button>
             </form>
-            <a href="{% url 'curso:descargar_zip' curso.pk %}" 
-               class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700 transition-colors uppercase {% if not estudiantes_con_cert %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}"
-               {% if not estudiantes_con_cert %}disabled{% endif %}>
+            <a href="{% url 'curso:descargar_zip' curso.pk %}"
+                class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-green-600 hover:bg-green-700 transition-colors uppercase {% if not estudiantes_con_cert %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}"
+                {% if not estudiantes_con_cert %}disabled{% endif %}>
                 <i class="fas fa-file-zipper mr-1"></i> ZIP
             </a>
         </div>
@@ -52,10 +56,18 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Datos del Estudiante</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Identificación</th>
-                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Estado PDF</th>
-                        <th class="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">Acciones</th>
+                        <th
+                            class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            Datos del Estudiante</th>
+                        <th
+                            class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            Identificación</th>
+                        <th
+                            class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            Estado PDF</th>
+                        <th
+                            class="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                            Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
@@ -69,44 +81,64 @@
                             </div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">
-                            <span class="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded-sm text-[10px] font-mono text-gray-600">{{ est.cedula }}</span>
+                            <span
+                                class="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded-sm text-[10px] font-mono text-gray-600">{{ est.cedula }}</span>
                         </td>
                         <td class="px-4 py-2 text-center">
                             {% if cert and cert.archivo_generado %}
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 text-[10px] font-bold border border-green-200 uppercase">
+                            <span
+                                class="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-green-100 text-green-800 text-[10px] font-bold border border-green-200 uppercase">
                                 Generado
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 uppercase">
+                            <span
+                                class="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 uppercase">
                                 Pendiente
                             </span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap text-xs font-medium space-x-1">
-                            <form method="post" action="{% url 'curso:generar_individual' est.pk %}" class="inline" data-requires-config="true">
+                            <form method="post" action="{% url 'curso:generar_individual' est.pk %}" class="inline"
+                                data-requires-config="true">
                                 {% csrf_token %}
-                                <button type="submit" class="text-indigo-600 hover:text-indigo-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5" title="Generar PDF"
-                                        data-has-config="{% if curso.plantilla_certificado and curso.configuracion_certificado %}true{% else %}false{% endif %}">
+                                <button type="submit"
+                                    class="text-indigo-600 hover:text-indigo-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5"
+                                    title="Generar PDF"
+                                    data-has-config="{% if curso.plantilla_certificado and curso.configuracion_certificado %}true{% else %}false{% endif %}">
                                     <i class="fas fa-arrows-rotate"></i>
                                 </button>
                             </form>
 
                             {% if cert and cert.archivo_generado %}
-                            <a href="{{ cert.archivo_generado.url }}" target="_blank" class="text-blue-600 hover:text-blue-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5" title="Previsualizar">
+                            {% with status=cert.status_archivo %}
+                            {% if status.exists %}
+                            <a href="{% url 'curso:certificate_download' cert.pk %}" target="_blank"
+                                class="text-blue-600 hover:text-blue-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5"
+                                title="Ver / Descargar">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <a href="{% url 'curso:certificate_download' cert.pk %}" class="text-green-600 hover:text-green-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5" title="Descargar">
-                                <i class="fas fa-download"></i>
-                            </a>
                             {% else %}
-                            <span class="text-gray-300 bg-gray-50 border border-gray-200 px-2 py-1 rounded-sm inline-block mb-0.5 cursor-not-allowed"><i class="fas fa-eye"></i></span>
-                            <span class="text-gray-300 bg-gray-50 border border-gray-200 px-2 py-1 rounded-sm inline-block mb-0.5 cursor-not-allowed"><i class="fas fa-download"></i></span>
+                            <span
+                                class="text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded-sm inline-block mb-0.5 cursor-help"
+                                title="Error: El archivo no existe en el NAS">
+                                <i class="fas fa-file-circle-exclamation"></i>
+                            </span>
+                            {% endif %}
+                            {% endwith %}
+                            {% else %}
+                            <span
+                                class="text-gray-300 bg-gray-50 border border-gray-200 px-2 py-1 rounded-sm inline-block mb-0.5 cursor-not-allowed"><i
+                                    class="fas fa-eye"></i></span>
                             {% endif %}
 
-                            <a href="{% url 'curso:estudiante_edit' est.pk %}" class="text-gray-600 hover:text-gray-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5" title="Editar">
+                            <a href="{% url 'curso:estudiante_edit' est.pk %}"
+                                class="text-gray-600 hover:text-gray-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5"
+                                title="Editar">
                                 <i class="fas fa-pen"></i>
                             </a>
-                            <a href="{% url 'curso:estudiante_delete' est.pk %}" class="text-red-600 hover:text-red-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5" title="Eliminar">
+                            <a href="{% url 'curso:estudiante_delete' est.pk %}"
+                                class="text-red-600 hover:text-red-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 inline-block mb-0.5"
+                                title="Eliminar">
                                 <i class="fas fa-trash-alt"></i>
                             </a>
                         </td>
@@ -121,8 +153,10 @@
     <div class="bg-white border border-gray-300 rounded-sm shadow-sm p-10 text-center">
         <i class="fas fa-users-slash text-4xl text-gray-200 mb-3"></i>
         <h3 class="text-sm font-bold text-gray-900 uppercase">Sin estudiantes</h3>
-        <p class="text-xs text-gray-500 mt-1 max-w-xs mx-auto mb-6">Cargue la nómina desde los ajustes del curso o registre manualmente.</p>
-        <a href="{% url 'curso:edit' curso.pk %}" class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase">
+        <p class="text-xs text-gray-500 mt-1 max-w-xs mx-auto mb-6">Cargue la nómina desde los ajustes del curso o
+            registre manualmente.</p>
+        <a href="{% url 'curso:edit' curso.pk %}"
+            class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-sm shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase">
             <i class="fas fa-upload mr-1"></i> Importar Excel
         </a>
     </div>
@@ -133,18 +167,21 @@
 <div id="full-screen-loader" class="fixed inset-0 z-[9999] hidden">
     <!-- Backdrop -->
     <div class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity"></div>
-    
+
     <!-- Content -->
     <div class="relative flex min-h-screen items-center justify-center p-4">
-        <div class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+        <div
+            class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
             <div class="flex flex-col items-center justify-center text-center">
                 <!-- Animated Icon -->
                 <div class="mb-6 relative">
                     <div class="w-20 h-20 border-4 border-indigo-100 rounded-full animate-spin"></div>
-                    <div class="w-20 h-20 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
-                    <i id="loader-icon" class="fas fa-bolt absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl"></i>
+                    <div class="w-20 h-20 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0">
+                    </div>
+                    <i id="loader-icon"
+                        class="fas fa-bolt absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl"></i>
                 </div>
-                
+
                 <h3 id="loader-title" class="text-lg font-black text-gray-900 leading-6 mb-2">Procesando...</h3>
                 <div class="space-y-2">
                     <p id="loader-desc" class="text-sm text-gray-500">
@@ -162,7 +199,7 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Elements
         const loader = document.getElementById('full-screen-loader');
         const loaderTitle = document.getElementById('loader-title');
@@ -177,10 +214,10 @@
             loaderTitle.textContent = title;
             loaderDesc.innerHTML = desc;
             loaderSub.textContent = sub || 'Esto puede tomar unos momentos.';
-            
+
             // Reset icon classes and set new ones
             loaderIcon.className = `fas ${iconClass} absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl`;
-            
+
             // Show overlay
             loader.classList.remove('hidden');
         }
@@ -191,24 +228,24 @@
          */
         function handleControlledFormSubmit(e, form, config) {
             e.preventDefault();
-            
+
             // Check if config is required and missing
             const requiresConfig = form.dataset.requiresConfig === 'true';
             const btn = form.querySelector('button[type="submit"]');
             const hasConfigValue = btn ? btn.dataset.hasConfig : null;
-            
+
             // Normalizar a lowercase para manejar "True"/"False" de Django
             const hasConfig = hasConfigValue ? (hasConfigValue.toLowerCase() === 'true') : true;
-            
+
             if (requiresConfig && !hasConfig) {
                 // Show error feedback
                 alert('⚠️ Configuración requerida\n\nEl certificado no ha sido diseñado aún. Por favor, diseña el certificado antes de generar.');
                 return; // Prevent submission
             }
-            
+
             // 1. Show Visual Feedback
             showLoader(config.title, config.desc, config.sub, config.icon);
-            
+
             // 2. Disable button to prevent double-clicks
             if (btn) btn.classList.add('opacity-50', 'cursor-not-allowed');
 
@@ -222,9 +259,9 @@
         // 1. GENERAR TODOS (MASIVO)
         // ============================================================
         const generateAllForm = document.querySelector('form[action*="generar-todos"]');
-        
+
         if (generateAllForm) {
-            generateAllForm.addEventListener('submit', function(e) {
+            generateAllForm.addEventListener('submit', function (e) {
                 const studentCount = "{{ estudiantes|length }}";
                 handleControlledFormSubmit(e, this, {
                     title: 'Generando Masivamente',
@@ -239,9 +276,9 @@
         // 2. GENERAR INDIVIDUAL (LISTA)
         // ============================================================
         const individualForms = document.querySelectorAll('form[action*="generar-certificado"]');
-        
+
         individualForms.forEach(form => {
-            form.addEventListener('submit', function(e) {
+            form.addEventListener('submit', function (e) {
                 handleControlledFormSubmit(e, this, {
                     title: 'Generando Certificado',
                     desc: 'Creando PDF individual...',
@@ -256,16 +293,16 @@
         // ============================================================
         const zipLink = document.querySelector('a[href*="descargar_zip"]');
         if (zipLink) {
-            zipLink.addEventListener('click', function(e) {
+            zipLink.addEventListener('click', function (e) {
                 if (this.classList.contains('pointer-events-none')) return;
-                
+
                 e.preventDefault(); // Stop immediate navigation
                 const targetUrl = this.href;
 
                 // Show Loader
                 showLoader(
-                    'Preparando ZIP', 
-                    'Comprimiendo todos los certificados...', 
+                    'Preparando ZIP',
+                    'Comprimiendo todos los certificados...',
                     'La descarga comenzará automáticamente.',
                     'fa-file-zipper'
                 );
@@ -273,10 +310,10 @@
                 // Wait for paint, then navigate
                 setTimeout(() => {
                     window.location.href = targetUrl;
-                    
+
                     // Auto-hide loader after 5s (since page won't reload)
                     setTimeout(() => {
-                       loader.classList.add('hidden');
+                        loader.classList.add('hidden');
                     }, 5000);
                 }, 100);
             });
