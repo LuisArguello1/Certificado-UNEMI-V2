@@ -12,4 +12,9 @@ urlpatterns = [
     path('enviar/<int:pk>/', views.SendCampaignView.as_view(), name='send'),
     path('detalle/<int:pk>/', views.CampaignDetailView.as_view(), name='detail'),
     path('reintentar/<int:pk>/', views.RetrySendView.as_view(), name='retry'),
+    
+    # Nuevas rutas para progreso y cancelación
+    path('progreso/<int:pk>/', views.CampaignProgressView.as_view(), name='progress'),
+    path('api/campaign/<int:pk>/progress/', views.CampaignProgressAPIView.as_view(), name='api_progress'),
+    path('cancelar/<int:pk>/', views.CancelCampaignView.as_view(), name='cancel'),
 ]

@@ -36,7 +36,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         # Imports de modelos
         from apps.curso.models import Curso, Estudiante, Certificado
-        from apps.correo.models import EmailCampaign, EmailRecipient
+        from apps.correo.models import EmailCampaign, EmailRecipient, EmailDailyLimit
         from django.db.models import Count, Q, Sum
         from datetime import datetime, timedelta
         
@@ -102,13 +102,29 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             fecha_generacion__date__gte=inicio_mes
         ).count()
         
-        # Tasa de generación de certificados
+        # Tasa de certificación
         if context['total_estudiantes'] > 0:
             context['tasa_certificacion'] = round(
                 (context['total_certificados'] / context['total_estudiantes']) * 100, 1
             )
         else:
             context['tasa_certificacion'] = 0
+
+        # ===== LÍMITE DIARIO DE CORREOS =====
+        from django.conf import settings
+        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        
+        limit_record, _ = EmailDailyLimit.objects.get_or_create(date=hoy)
+        correos_enviados_hoy = limit_record.count
+        
+        context['email_daily_limit'] = daily_limit
+        context['email_sent_today'] = correos_enviados_hoy
+        context['email_remaining_today'] = max(0, daily_limit - correos_enviados_hoy)
+        
+        if daily_limit > 0:
+            context['email_daily_percent'] = round((correos_enviados_hoy / daily_limit) * 100, 1)
+        else:
+            context['email_daily_percent'] = 0
         
         return context
 

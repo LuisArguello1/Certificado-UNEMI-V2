@@ -1,13 +1,14 @@
 """
 Servicio para gestionar el envío masivo de correos.
 """
-from django.core.mail import send_mail
+from django.core.mail import send_mail, get_connection
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 from django.utils import timezone
-from ..models import EmailCampaign, EmailRecipient, Curso
+from ..models import EmailCampaign, EmailRecipient, Curso, EmailDailyLimit
 import logging
+import time
 from django.urls import reverse
 
 logger = logging.getLogger(__name__)
@@ -75,9 +76,55 @@ class EmailCampaignService:
         return campaign
     
     @staticmethod
-    def send_campaign(campaign_id):
+    def send_campaign(campaign_id, use_celery=True):
         """
-        Envía todos los correos de una campaña.
+        Encola el envío de una campaña usando Celery (modo asíncrono).
+        
+        Args:
+            campaign_id: ID de la campaña
+            use_celery: Si es True usa Celery, si es False usa modo síncrono
+            
+        Returns:
+            dict: Resultado con task_id si es asíncrono
+        """
+        if use_celery:
+            # Modo asíncrono con Celery
+            from ..tasks import send_campaign_async
+            
+            try:
+                campaign = EmailCampaign.objects.get(id=campaign_id)
+                
+                # Encolar tarea en Celery
+                task = send_campaign_async.delay(campaign_id)
+                
+                # Guardar task_id en la campaña
+                campaign.celery_task_id = task.id
+                campaign.status = 'processing'
+                campaign.save()
+                
+                logger.info(f"Campaña {campaign_id} encolada en Celery con task_id: {task.id}")
+                
+                return {
+                    'success': True,
+                    'task_id': task.id,
+                    'message': 'Campaña encolada para envío asíncrono'
+                }
+                
+            except EmailCampaign.DoesNotExist:
+                return {'success': False, 'error': 'Campaña no encontrada'}
+            except Exception as e:
+                logger.error(f"Error al encolar campaña {campaign_id}: {str(e)}")
+                return {'success': False, 'error': str(e)}
+        else:
+            # Modo síncrono (para testing o envíos pequeños)
+            return EmailCampaignService.send_campaign_sync(campaign_id)
+    
+    @staticmethod
+    def send_campaign_sync(campaign_id):
+        """
+        Envía todos los correos de una campaña de forma síncrona.
+        Solo para testing o envíos muy pequeños.
+        
         Args:
             campaign_id: ID de la campaña
         """
@@ -96,28 +143,52 @@ class EmailCampaignService:
             # Obtener destinatarios pendientes
             recipients = campaign.recipients.filter(status='pending')
             
-            for recipient in recipients:
-                try:
-                    # Enviar el correo
-                    EmailCampaignService._send_email_to_recipient(campaign, recipient)
-                    
-                    # Actualizar estado
-                    recipient.status = 'sent'
-                    recipient.sent_at = timezone.now()
-                    recipient.save()
-                    
-                    result['sent'] += 1
-                    
-                except Exception as e:
-                    error_msg = str(e)
-                    recipient.status = 'failed'
-                    recipient.error_message = error_msg
-                    recipient.save()
-                    
-                    result['failed'] += 1
-                    result['errors'].append(f"{recipient.email}: {error_msg}")
-                    
-                    logger.error(f"Error enviando correo a {recipient.email}: {error_msg}")
+            # Crear conexión reutilizable
+            connection = get_connection()
+            connection.open()
+            
+            try:
+                rate_limit = getattr(settings, 'EMAIL_RATE_LIMIT_SECONDS', 2)
+                
+                for idx, recipient in enumerate(recipients):
+                    try:
+                        # Verificar límite diario
+                        if not EmailDailyLimit.can_send_email():
+                            logger.warning(f"Límite diario alcanzado. Deteniendo envío.")
+                            result['errors'].append("Límite diario alcanzado")
+                            break
+                        
+                        # Enviar el correo con conexión reutilizable
+                        EmailCampaignService._send_email_to_recipient_with_connection(
+                            campaign, recipient, connection
+                        )
+                        
+                        # Actualizar estado
+                        recipient.status = 'sent'
+                        recipient.sent_at = timezone.now()
+                        recipient.save()
+                        
+                        # Incrementar contador diario
+                        EmailDailyLimit.increment_count()
+                        
+                        result['sent'] += 1
+                        
+                        # Rate limiting
+                        if idx < recipients.count() - 1:
+                            time.sleep(rate_limit)
+                        
+                    except Exception as e:
+                        error_msg = str(e)
+                        recipient.status = 'failed'
+                        recipient.error_message = error_msg
+                        recipient.save()
+                        
+                        result['failed'] += 1
+                        result['errors'].append(f"{recipient.email}: {error_msg}")
+                        
+                        logger.error(f"Error enviando correo a {recipient.email}: {error_msg}")
+            finally:
+                connection.close()
             
             # Actualizar estadísticas de la campaña
             campaign.update_statistics()
@@ -136,7 +207,7 @@ class EmailCampaignService:
         return result
     
     @staticmethod
-    def _send_email_to_recipient(campaign, recipient):
+    def _send_email_to_recipient_with_connection(campaign, recipient, connection=None):
         """
         Envía un correo a un destinatario específico.
         """
@@ -248,12 +319,14 @@ class EmailCampaignService:
         for img in images_to_attach:
             msg.attach(img)
             
-        # 5. Enviar
+        # 5. Enviar con conexión (reutilizable o nueva)
+        if connection:
+            msg.connection = connection
         msg.send(fail_silently=False)
     
     @staticmethod
     def retry_failed_emails(campaign_id):
-        # ... (Logica de retry igual que antes)
+        """Reintenta enviar los correos fallidos de una campaña."""
         result = {
             'success': False,
             'sent': 0,
@@ -265,25 +338,47 @@ class EmailCampaignService:
             campaign = EmailCampaign.objects.get(id=campaign_id)
             failed_recipients = campaign.recipients.filter(status='failed')
             
-            for recipient in failed_recipients:
-                try:
-                    recipient.status = 'pending'
-                    recipient.error_message = ''
-                    recipient.save()
-                    
-                    EmailCampaignService._send_email_to_recipient(campaign, recipient)
-                    
-                    recipient.status = 'sent'
-                    recipient.sent_at = timezone.now()
-                    recipient.save()
-                    result['sent'] += 1
-                    
-                except Exception as e:
-                    recipient.status = 'failed'
-                    recipient.error_message = str(e)
-                    recipient.save()
-                    result['failed'] += 1
-                    result['errors'].append(f"{recipient.email}: {str(e)}")
+            # Crear conexión reutilizable
+            connection = get_connection()
+            connection.open()
+            
+            try:
+                rate_limit = getattr(settings, 'EMAIL_RATE_LIMIT_SECONDS', 2)
+                
+                for idx, recipient in enumerate(failed_recipients):
+                    try:
+                        # Verificar límite diario
+                        if not EmailDailyLimit.can_send_email():
+                            logger.warning("Límite diario alcanzado durante retry")
+                            break
+                        
+                        recipient.status = 'pending'
+                        recipient.error_message = ''
+                        recipient.save()
+                        
+                        EmailCampaignService._send_email_to_recipient_with_connection(
+                            campaign, recipient, connection
+                        )
+                        
+                        recipient.status = 'sent'
+                        recipient.sent_at = timezone.now()
+                        recipient.save()
+                        
+                        EmailDailyLimit.increment_count()
+                        result['sent'] += 1
+                        
+                        # Rate limiting
+                        if idx < failed_recipients.count() - 1:
+                            time.sleep(rate_limit)
+                        
+                    except Exception as e:
+                        recipient.status = 'failed'
+                        recipient.error_message = str(e)
+                        recipient.save()
+                        result['failed'] += 1
+                        result['errors'].append(f"{recipient.email}: {str(e)}")
+            finally:
+                connection.close()
             
             campaign.update_statistics()
             campaign.save()
@@ -293,3 +388,47 @@ class EmailCampaignService:
             result['errors'].append(f"Error: {str(e)}")
         
         return result
+    
+    @staticmethod
+    def cancel_campaign(campaign_id):
+        """
+        Cancela una campaña en curso revocando la tarea de Celery.
+        
+        Args:
+            campaign_id: ID de la campaña a cancelar
+            
+        Returns:
+            dict: Resultado de la cancelación
+        """
+        try:
+            from celery import current_app
+            
+            campaign = EmailCampaign.objects.get(id=campaign_id)
+            
+            if campaign.status != 'processing':
+                return {
+                    'success': False,
+                    'error': 'La campaña no está en proceso de envío'
+                }
+            
+            # Revocar tarea de Celery si existe
+            if campaign.celery_task_id:
+                current_app.control.revoke(campaign.celery_task_id, terminate=True)
+                logger.info(f"Tarea Celery {campaign.celery_task_id} revocada")
+            
+            # Actualizar estado
+            campaign.status = 'cancelled'
+            campaign.save()
+            
+            logger.info(f"Campaña {campaign_id} cancelada")
+            
+            return {
+                'success': True,
+                'message': 'Campaña cancelada exitosamente'
+            }
+            
+        except EmailCampaign.DoesNotExist:
+            return {'success': False, 'error': 'Campaña no encontrada'}
+        except Exception as e:
+            logger.error(f"Error al cancelar campaña {campaign_id}: {str(e)}")
+            return {'success': False, 'error': str(e)}

@@ -173,21 +173,32 @@
         <div
             class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
             <div class="flex flex-col items-center justify-center text-center">
-                <!-- Animated Icon -->
-                <div class="mb-6 relative">
-                    <div class="w-20 h-20 border-4 border-indigo-100 rounded-full animate-spin"></div>
-                    <div class="w-20 h-20 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0">
-                    </div>
-                    <i id="loader-icon"
-                        class="fas fa-bolt absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl"></i>
+                <!-- Icono de Estado -->
+                <div class="mb-4 relative">
+                    <div id="loader-spinner" class="w-16 h-16 border-4 border-indigo-100 rounded-full animate-spin"></div>
+                    <div id="loader-spinner-top" class="w-16 h-16 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
+                    <i id="loader-icon" class="fas fa-bolt absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl"></i>
                 </div>
 
-                <h3 id="loader-title" class="text-lg font-black text-gray-900 leading-6 mb-2">Procesando...</h3>
-                <div class="space-y-2">
-                    <p id="loader-desc" class="text-sm text-gray-500">
-                        Por favor esperar, no cierres la ventana.
-                    </p>
-                    <p id="loader-sub" class="text-xs text-gray-400">Esto puede tomar unos momentos.</p>
+                <h3 id="loader-title" class="text-lg font-black text-gray-900 leading-6 mb-1">Procesando...</h3>
+                <p id="loader-desc" class="text-sm text-gray-600 mb-4">Por favor esperar, no cierres la ventana.</p>
+
+                <!-- Barra de Progreso -->
+                <div id="progress-container" class="w-full bg-gray-200 rounded-full h-4 mb-2 hidden">
+                    <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="progress-stats" class="flex justify-between w-full text-xs text-gray-500 font-mono hidden">
+                    <span id="progress-percent">0%</span>
+                    <span id="progress-text">Iniciando...</span>
+                </div>
+
+                <!-- Mensaje final / Error -->
+                <div id="result-message" class="mt-4 hidden p-3 rounded-md text-sm w-full text-left"></div>
+
+                <div class="mt-4 flex justify-center hidden" id="action-buttons">
+                    <button type="button" onclick="window.location.reload()" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">
+                        Aceptar
+                    </button>
                 </div>
             </div>
         </div>
@@ -204,118 +215,192 @@
         const loader = document.getElementById('full-screen-loader');
         const loaderTitle = document.getElementById('loader-title');
         const loaderDesc = document.getElementById('loader-desc');
-        const loaderSub = document.getElementById('loader-sub');
         const loaderIcon = document.getElementById('loader-icon');
+        
+        // Progress Elements
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressStats = document.getElementById('progress-stats');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressText = document.getElementById('progress-text');
+        
+        // Result Elements
+        const resultMessage = document.getElementById('result-message');
+        const actionButtons = document.getElementById('action-buttons');
+        const loaderSpinner = document.getElementById('loader-spinner');
+        const loaderSpinnerTop = document.getElementById('loader-spinner-top');
+
+        // Helper: Reset Loader State
+        function resetLoader() {
+            loader.classList.add('hidden');
+            progressContainer.classList.add('hidden');
+            progressStats.classList.add('hidden');
+            resultMessage.classList.add('hidden');
+            actionButtons.classList.add('hidden');
+            
+            // Show Spinner
+            loaderSpinner.classList.remove('hidden');
+            loaderSpinnerTop.classList.remove('hidden');
+            
+            // Reset Text
+            loaderTitle.textContent = 'Procesando...';
+            loaderDesc.textContent = 'Por favor esperar, no cierres la ventana.';
+            progressBar.style.width = '0%';
+        }
 
         /**
-         * Helper to show the overlay with custom text/icon
+         * Helper to show simple loader (no progress bar)
          */
-        function showLoader(title, desc, sub, iconClass = 'fa-bolt') {
+        function showLoader(title, desc, iconClass = 'fa-bolt') {
+            resetLoader();
             loaderTitle.textContent = title;
             loaderDesc.innerHTML = desc;
-            loaderSub.textContent = sub || 'Esto puede tomar unos momentos.';
-
-            // Reset icon classes and set new ones
+            
             loaderIcon.className = `fas ${iconClass} absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl`;
-
-            // Show overlay
             loader.classList.remove('hidden');
         }
 
-        /**
-         * Controlled Submit Handler
-         * Prevents default, paints the loader, waits, then natively submits.
-         */
-        function handleControlledFormSubmit(e, form, config) {
-            e.preventDefault();
-
-            // Check if config is required and missing
-            const requiresConfig = form.dataset.requiresConfig === 'true';
-            const btn = form.querySelector('button[type="submit"]');
-            const hasConfigValue = btn ? btn.dataset.hasConfig : null;
-
-            // Normalizar a lowercase para manejar "True"/"False" de Django
-            const hasConfig = hasConfigValue ? (hasConfigValue.toLowerCase() === 'true') : true;
-
-            if (requiresConfig && !hasConfig) {
-                // Show error feedback
-                alert('⚠️ Configuración requerida\n\nEl certificado no ha sido diseñado aún. Por favor, diseña el certificado antes de generar.');
-                return; // Prevent submission
-            }
-
-            // 1. Show Visual Feedback
-            showLoader(config.title, config.desc, config.sub, config.icon);
-
-            // 2. Disable button to prevent double-clicks
-            if (btn) btn.classList.add('opacity-50', 'cursor-not-allowed');
-
-            // 3. Wait for Paint (100ms) then Submit
-            setTimeout(() => {
-                form.submit();
-            }, 100);
-        }
-
         // ============================================================
-        // 1. GENERAR TODOS (MASIVO)
+        // 1. GENERAR TODOS (MASIVO - AHORA ASÍNCRONO)
         // ============================================================
         const generateAllForm = document.querySelector('form[action*="generar-todos"]');
+        const courseId = "{{ curso.pk }}"; // Context variable
 
         if (generateAllForm) {
             generateAllForm.addEventListener('submit', function (e) {
-                const studentCount = "{{ estudiantes|length }}";
-                handleControlledFormSubmit(e, this, {
-                    title: 'Generando Masivamente',
-                    desc: `Procesando una nómina de <strong class="text-indigo-600">${studentCount}</strong> estudiantes.`,
-                    sub: 'Por favor, NO CIERRES esta ventana.',
-                    icon: 'fa-users'
+                e.preventDefault();
+                
+                // 1. Check Config
+                const btn = this.querySelector('button[type="submit"]');
+                const hasConfig = btn.dataset.hasConfig === 'true';
+                if (!hasConfig) {
+                    alert('⚠️ Configuración requerida\n\nEl certificado no ha sido diseñado aún.');
+                    return;
+                }
+
+                // 2. Start UI
+                resetLoader();
+                loaderTitle.textContent = 'Generando Certificados';
+                loaderDesc.textContent = 'Iniciando proceso en segundo plano...';
+                loaderIcon.className = 'fas fa-cogs absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl';
+                
+                loader.classList.remove('hidden');
+                progressContainer.classList.remove('hidden');
+                progressStats.classList.remove('hidden');
+
+                // 3. AJAX Request to Start Task
+                const formData = new FormData(this);
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Start Polling
+                        startPolling(courseId);
+                    } else {
+                        showError(data.error || 'Error al iniciar el proceso.');
+                    }
+                })
+                .catch(err => {
+                    showError('Error de conexión al servidor.');
+                    console.error(err);
                 });
             });
         }
 
+        // Polling Function
+        let pollInterval;
+        function startPolling(pk) {
+            pollInterval = setInterval(() => {
+                fetch(`{% url 'curso:generar_progreso' 0 %}`.replace('0', pk))
+                .then(res => res.json())
+                .then(data => {
+                    // Update UI
+                    const p = data.progress || 0;
+                    progressBar.style.width = `${p}%`;
+                    progressPercent.textContent = `${p}%`;
+                    progressText.textContent = getStatusText(data.status);
+
+                    if (data.is_complete) {
+                        clearInterval(pollInterval);
+                        setTimeout(() => showSuccess(), 500);
+                    }
+                })
+                .catch(err => console.error("Polling error:", err));
+            }, 1000);
+        }
+
+        function getStatusText(status) {
+            if (status === 'processing') return 'Procesando...';
+            if (status === 'completed') return 'Finalizando...';
+            if (status === 'idle') return 'En espera...';
+            return 'Estado desconocido';
+        }
+
+        function showSuccess() {
+            loaderSpinner.classList.add('hidden');
+            loaderSpinnerTop.classList.add('hidden');
+            loaderIcon.className = 'fas fa-check-circle text-green-500 text-5xl static transform-none';
+            
+            loaderTitle.textContent = '¡Proceso Completado!';
+            loaderDesc.textContent = 'Todos los certificados han sido generados exitosamente.';
+            
+            // Hide progress
+            progressContainer.classList.add('hidden');
+            progressStats.classList.add('hidden');
+            
+            actionButtons.classList.remove('hidden');
+        }
+
+        function showError(msg) {
+            clearInterval(pollInterval);
+            loaderSpinner.classList.add('hidden');
+            loaderSpinnerTop.classList.add('hidden');
+            loaderIcon.className = 'fas fa-times-circle text-red-500 text-5xl static transform-none';
+            
+            loaderTitle.textContent = 'Error';
+            loaderDesc.textContent = 'Hubo un problema durante el proceso.';
+            
+            resultMessage.textContent = msg;
+            resultMessage.className = 'mt-4 p-3 rounded-md text-sm w-full text-left bg-red-50 text-red-700 border border-red-200';
+            resultMessage.classList.remove('hidden');
+            
+            actionButtons.classList.remove('hidden');
+        }
+
         // ============================================================
-        // 2. GENERAR INDIVIDUAL (LISTA)
+        // 2. OTHER HANDLERS (Same as before but simplified helper)
         // ============================================================
         const individualForms = document.querySelectorAll('form[action*="generar-certificado"]');
-
         individualForms.forEach(form => {
             form.addEventListener('submit', function (e) {
-                handleControlledFormSubmit(e, this, {
-                    title: 'Generando Certificado',
-                    desc: 'Creando PDF individual...',
-                    sub: 'Solo tomará un instante.',
-                    icon: 'fa-file-pdf'
-                });
+                // Check config local
+               const btn = this.querySelector('button');
+               if(btn && btn.dataset.hasConfig === 'false') {
+                   e.preventDefault();
+                   alert('⚠️ Configuración requerida');
+                   return;
+               }
+               showLoader('Generando PDF', 'Por favor espera...', 'fa-file-pdf');
             });
         });
 
-        // ============================================================
-        // 3. DESCARGAR ZIP
-        // ============================================================
         const zipLink = document.querySelector('a[href*="descargar_zip"]');
         if (zipLink) {
             zipLink.addEventListener('click', function (e) {
                 if (this.classList.contains('pointer-events-none')) return;
-
-                e.preventDefault(); // Stop immediate navigation
-                const targetUrl = this.href;
-
-                // Show Loader
-                showLoader(
-                    'Preparando ZIP',
-                    'Comprimiendo todos los certificados...',
-                    'La descarga comenzará automáticamente.',
-                    'fa-file-zipper'
-                );
-
-                // Wait for paint, then navigate
+                e.preventDefault();
+                showLoader('Preparando ZIP', 'Comprimiendo archivos...', 'fa-file-zipper');
                 setTimeout(() => {
-                    window.location.href = targetUrl;
-
-                    // Auto-hide loader after 5s (since page won't reload)
-                    setTimeout(() => {
-                        loader.classList.add('hidden');
-                    }, 5000);
-                }, 100);
+                    window.location.href = this.href;
+                    setTimeout(() => loader.classList.add('hidden'), 5000);
+                }, 500);
             });
         }
     });

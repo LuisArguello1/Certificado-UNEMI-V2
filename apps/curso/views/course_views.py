@@ -87,24 +87,48 @@ class ExcelProcessMixin:
                             if key == 'cedula': col_cedula = col
                             if key == 'correo': col_correo = col
                             break
+            
+            if not col_cedula:
+                messages.warning(self.request, "No se encontró columna de Cédula válida en el archivo.")
+                return
+
+            # --- SANITIZACIÓN DE DUPLICADOS ---
+            # Normalizar cédulas en el DF para detectar duplicados reales
+            def clean_cedula_val(val):
+                v = str(val).strip()
+                if v.lower() == 'nan' or not v: return None
+                # Ajuste longitud Ecuador
+                if len(v) == 9 and v.isdigit(): return '0' + v
+                return v
+
+            # Crear columna temporal normalizada
+            df['temp_cedula_clean'] = df[col_cedula].apply(clean_cedula_val)
+            
+            # Eliminar filas donde la cédula sea nula
+            df_valid = df.dropna(subset=['temp_cedula_clean'])
+            valid_records = len(df_valid)
+            
+            # Eliminar duplicados manteniendo el primero
+            df_unique = df_valid.drop_duplicates(subset=['temp_cedula_clean'], keep='first')
+            unique_records = len(df_unique)
+            duplicados_eliminados = valid_records - unique_records
+            
+            if duplicados_eliminados > 0:
+                messages.warning(
+                    self.request, 
+                    f"⚠️ Se omitieron {duplicados_eliminados} registros con cédula duplicada en el archivo. Se procesó solo la primera aparición."
+                )
 
             estudiantes_creados = 0
-            # Procesar filas
-            for index, row in df.iterrows():
-                cedula_raw = str(row[col_cedula]).strip() if col_cedula else None
-                if not cedula_raw or cedula_raw.lower() == 'nan':
-                    continue
-
-                # Normalizar cédula a 10 dígitos (Ecuador)
-                if len(cedula_raw) == 9 and cedula_raw.isdigit():
-                    cedula_final = '0' + cedula_raw
-                else:
-                    cedula_final = cedula_raw
-
+            # Procesar filas únicas
+            for index, row in df_unique.iterrows():
+                cedula_final = row['temp_cedula_clean']
+                
                 nombre_limpio = str(row[col_nombre]).strip() if col_nombre else "Sin Nombre"
                 correo_limpio = str(row[col_correo]).strip().lower() if col_correo and pd.notna(row[col_correo]) else ""
 
                 if cedula_final:
+                    # Usamos update_or_create para manejar re-subidas del mismo archivo sin error
                     Estudiante.objects.update_or_create(
                         curso=curso,
                         cedula=cedula_final,
@@ -115,7 +139,7 @@ class ExcelProcessMixin:
                     )
                     estudiantes_creados += 1
 
-            messages.success(self.request, f"Excel procesado con éxito: {estudiantes_creados} estudiantes registrados.")
+            messages.success(self.request, f"Excel procesado con éxito: {estudiantes_creados} estudiantes registrados/actualizados.")
 
         except Exception as e:
             messages.error(self.request, f"Error al procesar el Excel: {str(e)}")
@@ -554,42 +578,48 @@ class GenerarCertificadoView(UpdateView):
             
         return redirect('curso:estudiantes', pk=estudiante.curso.pk)
 
-class GenerarTodosCertificadosView(UpdateView):
+class GenerarTodosCertificadosView(View):
     """
-    Genera certificados para TODOS los estudiantes de un curso.
+    Inicia la generación asíncrona de certificados.
+    Retorna JSON para manejo via AJAX.
     """
     def post(self, request, pk):
-        from ..services.certificate_service import CertificateService
-        curso = Curso.objects.get(pk=pk)
-        # Optimization: Use iterator() for large datasets if needed, though for generation step by step 
-        # standard iteration is mostly IO bound by PDF generation.
-        estudiantes = Estudiante.objects.filter(curso=curso)
-        
-        exitos = 0
-        errores = 0
+        curso = get_object_or_404(Curso, pk=pk)
         
         if not curso.plantilla_certificado or not curso.configuracion_certificado:
-            messages.error(request, "Debe seleccionar una plantilla y guardar la configuración en el 'Configurador' antes de generar certificados.")
-            return redirect('curso:estudiantes', pk=pk)
+            return JsonResponse({
+                'success': False, 
+                'error': "Debe configurar el certificado antes de generar."
+            }, status=400)
 
-        for estudiante in estudiantes:
-            try:
-                # Usamos update_or_create para asegurar que se use la plantilla actual del curso
-                certificado, created = Certificado.objects.update_or_create(
-                    estudiante=estudiante,
-                    defaults={'plantilla': curso.plantilla_certificado}
-                )
-                res = CertificateService.generate_pdf(certificado)
-                if res:
-                    exitos += 1
-                else:
-                    errores += 1
-            except Exception as e:
-                print(f"Error generando certificado para {estudiante}: {e}")
-                errores += 1
+        # Importar tarea aquí para evitar ciclos
+        from ..tasks import generate_course_certificates_async
         
-        messages.success(request, f"Proceso terminado: {exitos} certificados generados. {errores} errores.")
-        return redirect('curso:estudiantes', pk=pk)
+        # Iniciar tarea
+        task = generate_course_certificates_async.delay(curso.pk)
+        
+        # Actualizar estado inicial
+        curso.generation_status = 'processing'
+        curso.generation_progress = 0
+        curso.save()
+        
+        return JsonResponse({
+            'success': True,
+            'task_id': task.id,
+            'message': 'Proceso de generación iniciado en segundo plano.'
+        })
+
+class CursoGenerationProgressView(View):
+    """
+    Endpoint para consultar el progreso de generación.
+    """
+    def get(self, request, pk):
+        curso = get_object_or_404(Curso, pk=pk)
+        return JsonResponse({
+            'status': curso.generation_status,
+            'progress': curso.generation_progress,
+            'is_complete': curso.generation_status in ['completed', 'failed']
+        })
 
 class DescargarCertificadosZipView(ListView):
     """

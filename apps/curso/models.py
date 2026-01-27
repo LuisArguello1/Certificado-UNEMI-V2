@@ -137,6 +137,15 @@ class Curso(models.Model):
         help_text='Estado del curso en el portal público'
     )
     
+    # Tracking de Generación de Certificados
+    generation_task_id = models.CharField(max_length=255, blank=True, null=True)
+    generation_status = models.CharField(
+        max_length=20, 
+        default='idle', 
+        choices=[('idle','Inactivo'), ('processing','Procesando'), ('completed','Completado'), ('failed','Fallido')]
+    )
+    generation_progress = models.IntegerField(default=0)
+    
     fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
     actualizado_en = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
 

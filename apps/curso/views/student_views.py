@@ -86,18 +86,26 @@ class CertificateVerifyView(TemplateView):
 
 class CertificateDownloadView(View):
     """
-    Vista para descargar el archivo del certificado.
+    Vista para descargar o visualizar el archivo del certificado.
     """
     def get(self, request, pk):
+        import os # Ensure import within method scope if not global
         certificado = get_object_or_404(Certificado, pk=pk)
         
         # Validación de robustez NAS
         from apps.core.services.storage_service import StorageService
         status = StorageService.get_file_status(certificado.archivo_generado)
         
+        # Definir URL de retorno en caso de error
+        # Si es admin/staff, volver a la lista del curso. Si es publico, al portal.
+        if request.user.is_staff:
+            error_redirect = redirect('curso:estudiantes', pk=certificado.estudiante.curso.pk)
+        else:
+            error_redirect = redirect('curso:public_portal')
+
         if not status['exists']:
-            messages.error(request, "Archivo no disponible: El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.")
-            return redirect('curso:public_portal')
+            messages.error(request, "Error: El archivo físico no se encuentra disponible en el almacenamiento.")
+            return error_redirect
 
         try:
             # Forzar verificación de apertura antes de enviar respuesta
@@ -105,7 +113,8 @@ class CertificateDownloadView(View):
             if not file_path or not os.path.exists(file_path):
                  raise FileNotFoundError("Archivo no encontrado en la ruta esperada")
 
-            response = FileResponse(open(file_path, 'rb'), as_attachment=True, filename=os.path.basename(file_path))
+            # as_attachment=False permite ver en el navegador ("Preview") en lugar de forzar descarga
+            response = FileResponse(open(file_path, 'rb'), as_attachment=False, filename=os.path.basename(file_path))
             
             # Incrementar contador de accesos
             certificado.access_count += 1
@@ -113,9 +122,10 @@ class CertificateDownloadView(View):
             certificado.last_access = timezone.now()
             certificado.save(update_fields=['access_count', 'last_access'])
             return response
-        except (FileNotFoundError, IOError) as e:
-            messages.error(request, "Archivo no disponible: El certificado existe pero el archivo físico no se encuentra en el almacenamiento. Por favor, contacte a soporte.")
-            return redirect('curso:public_portal')
-        except Exception as e:
-            messages.error(request, "Archivo no disponible: Detectamos un problema técnico al recuperar su documento. Por favor, contacte a soporte.")
-            return redirect('curso:public_portal')
+            
+        except (FileNotFoundError, IOError):
+            messages.error(request, "Error de Lectura: No se pudo leer el archivo físico del certificado.")
+            return error_redirect
+        except Exception:
+            messages.error(request, "Error del Servidor: Fallo técnico al recuperar el documento.")
+            return error_redirect

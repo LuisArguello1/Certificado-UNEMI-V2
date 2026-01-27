@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.core.serializers.json import DjangoJSONEncoder
+from django.http import JsonResponse
 import json
 from ..forms import CampaignForm
 from ..models import EmailCampaign
@@ -202,31 +203,38 @@ class PreviewCampaignView(LoginRequiredMixin, DetailView):
 
 class SendCampaignView(LoginRequiredMixin, View):
     """
-    Vista para confirmar y enviar la campaña.
+    Vista para confirmar y enviar la campaña (modo asíncrono con Celery).
     """
     def post(self, request, pk):
         try:
-            # Enviar los correos usando el servicio
-            send_result = EmailCampaignService.send_campaign(pk)
+            # Enviar los correos usando el servicio (modo asíncrono)
+            send_result = EmailCampaignService.send_campaign(pk, use_celery=True)
             
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                # Respuesta JSON para AJAX
+                if send_result['success']:
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Campaña encolada correctamente',
+                        'task_id': send_result.get('task_id'),
+                        'campaign_id': pk
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False, 
+                        'error': send_result.get('error', 'Error desconocido')
+                    }, status=400)
+            
+            # Comportamiento normal (si no es AJAX)
             if send_result['success']:
                 messages.success(
                     request,
-                    f"Campaña enviada/procesada. "
-                    f"Enviados: {send_result['sent']}, Fallidos: {send_result['failed']}"
+                    f"Campaña encolada para envío. El proceso se realizará en segundo plano."
                 )
+                return redirect('correo:progress', pk=pk)
             else:
-                messages.warning(
-                    request,
-                    f"Campaña completada con errores. "
-                    f"Enviados: {send_result['sent']}, Fallidos: {send_result['failed']}"
-                )
-            
-            # Mostrar errores
-            for error in send_result['errors'][:5]:
-                messages.error(request, error)
-            
-            return redirect('correo:detail', pk=pk)
+                messages.error(request, f"Error: {send_result.get('error', 'Error desconocido')}")
+                return redirect('correo:preview', pk=pk)
             
         except Exception as e:
             messages.error(request, f"Error al enviar la campaña: {str(e)}")
@@ -290,6 +298,89 @@ class RetrySendView(LoginRequiredMixin, View):
                 messages.error(request, 'Error al reintentar envío.')
             
             return redirect('correo:detail', pk=pk)
+        except Exception as e:
+            messages.error(request, f"Error: {str(e)}")
+            return redirect('correo:list')
+
+
+class CampaignProgressView(LoginRequiredMixin, TemplateView):
+    """
+    Vista para mostrar el progreso en tiempo real de una campaña.
+    """
+    template_name = 'correo/campaign_progress.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        campaign_id = self.kwargs.get('pk')
+        
+        try:
+            campaign = EmailCampaign.objects.get(id=campaign_id)
+            context['campaign'] = campaign
+            
+            try:
+                from apps.core.services.menu_service import MenuService
+                context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
+            except ImportError: pass
+            
+            context['breadcrumbs'] = [
+                {'name': 'Correo', 'url': reverse('correo:list')},
+                {'name': campaign.name, 'url': reverse('correo:detail', kwargs={'pk': campaign_id})},
+                {'name': 'Progreso'}
+            ]
+            context['page_title'] = f'Progreso: {campaign.name}'
+            
+        except EmailCampaign.DoesNotExist:
+            messages.error(self.request, 'Campaña no encontrada')
+        
+        return context
+
+
+class CampaignProgressAPIView(LoginRequiredMixin, View):
+    """
+    Endpoint API para obtener el progreso de una campaña en tiempo real.
+    Retorna JSON con datos de progreso.
+    """
+    def get(self, request, pk):
+        from django.http import JsonResponse
+        
+        try:
+            campaign = EmailCampaign.objects.get(id=pk)
+            
+            # Actualizar estadísticas antes de enviar
+            campaign.update_statistics()
+            
+            # Obtener datos de progreso
+            progress_data = campaign.get_progress_data()
+            
+            return JsonResponse(progress_data)
+            
+        except EmailCampaign.DoesNotExist:
+            return JsonResponse(
+                {'error': 'Campaña no encontrada'}, 
+                status=404
+            )
+        except Exception as e:
+            return JsonResponse(
+                {'error': str(e)}, 
+                status=500
+            )
+
+
+class CancelCampaignView(LoginRequiredMixin, View):
+    """
+    Vista para cancelar una campaña en proceso.
+    """
+    def post(self, request, pk):
+        try:
+            result = EmailCampaignService.cancel_campaign(pk)
+            
+            if result['success']:
+                messages.success(request, result['message'])
+            else:
+                messages.error(request, result.get('error', 'Error al cancelar'))
+            
+            return redirect('correo:detail', pk=pk)
+            
         except Exception as e:
             messages.error(request, f"Error: {str(e)}")
             return redirect('correo:list')

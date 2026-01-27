@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_celery_results',
 ]
 
 # Aplicaciones de terceros
@@ -192,8 +193,23 @@ STATICFILES_DIRS = [BASE_DIR / "static",]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Configuración de archivos de medios
+USE_NAS_STORAGE = env.bool('USE_NAS_STORAGE', default=False)
+MEDIA_ROOT_PATH = env('MEDIA_ROOT_PATH', default=os.path.join(BASE_DIR, 'media'))
+
+if USE_NAS_STORAGE:
+    # Usar ruta del NAS explícita
+    MEDIA_ROOT = MEDIA_ROOT_PATH
+    # Verificación de salud al inicio (solo log, no bloqueante para runserver)
+    if not os.path.exists(MEDIA_ROOT) and not os.access(os.path.dirname(MEDIA_ROOT), os.W_OK):
+        print(f"⚠️ [CRITICAL] USE_NAS_STORAGE=True pero la ruta '{MEDIA_ROOT}' no es accesible. Las cargas de archivos fallarán.")
+else:
+    # Usar almacenamiento local
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    if not os.path.exists(MEDIA_ROOT):
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
+    print(f"ℹ[INFO] Usando almacenamiento local: {MEDIA_ROOT}")
+
 MEDIA_URL = '/media/'
-MEDIA_ROOT = env('MEDIA_ROOT_PATH', default=os.path.join(BASE_DIR, 'media'))
 
 # Configuración de cache para archivos estáticos y media
 STATIC_FILE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días en segundos
@@ -272,6 +288,27 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'apps.correo': {
+            'handlers': ['console', 'file_error'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Silenciar logs ruidosos de librerías gráficas
+        'fontTools': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'weasyprint': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'PIL': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
     },
 }
 
@@ -283,6 +320,35 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+
+# =============================================================================
+# CONFIGURACIÓN DE CELERY
+# =============================================================================
+
+# URL de conexión a Redis
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = 'django-db'  # Guardar resultados en BD Django
+
+# Configuración adicional de Celery
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutos máximo por tarea
+
+# =============================================================================
+# CONFIGURACIÓN DE LÍMITES DE ENVÍO DE CORREOS
+# =============================================================================
+
+# Límite diario global de correos (para evitar bloqueos del servidor SMTP)
+EMAIL_DAILY_LIMIT = env.int('EMAIL_DAILY_LIMIT', default=400)
+
+# Tiempo de espera entre envíos de correos individuales (en segundos)
+EMAIL_RATE_LIMIT_SECONDS = env.int('EMAIL_RATE_LIMIT_SECONDS', default=2)
+
+# Cantidad de correos por lote en procesamiento masivo
+EMAIL_BATCH_SIZE = env.int('EMAIL_BATCH_SIZE', default=10)
 
 
 # =============================================================================
