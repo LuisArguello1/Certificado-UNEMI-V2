@@ -26,6 +26,7 @@ urlpatterns = [
     path('estudiantes/eliminar/<int:pk>/', course_views.EstudianteDeleteView.as_view(), name='estudiante_delete'),
     path('generar-certificado/<int:pk>/', course_views.GenerarCertificadoView.as_view(), name='generar_individual'),
     path('generar-todos/<int:pk>/', course_views.GenerarTodosCertificadosView.as_view(), name='generar_todos'),
+    path('generar-progreso/<int:pk>/', course_views.CursoGenerationProgressView.as_view(), name='generar_progreso'),
     path('descargar-zip/<int:pk>/', course_views.DescargarCertificadosZipView.as_view(), name='descargar_zip'),
     path('descargar-zip/<int:pk>/', course_views.DescargarCertificadosZipView.as_view(), name='descargar_zip'),
 

@@ -279,30 +279,76 @@
     </div>
 </div>
 
-<!-- LOADING OVERLAY (Estilo curso_estudiantes) -->
+<!-- LOADING OVERLAY (Estilo curso_estudiantes + Progreso Real) -->
 <div id="full-screen-loader" class="fixed inset-0 z-[9999] hidden">
     <!-- Backdrop -->
-    <div class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity"></div>
+    <div class="absolute inset-0 bg-gray-900/90 backdrop-blur-sm transition-opacity"></div>
     
     <!-- Content -->
     <div class="relative flex min-h-screen items-center justify-center p-4">
-        <div class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-            <div class="flex flex-col items-center justify-center text-center">
-                <!-- Animated Icon -->
+        <div class="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-8 text-left align-middle shadow-2xl transition-all border border-indigo-100">
+            
+            <!-- Spinner / Header -->
+            <div class="flex flex-col items-center justify-center text-center mb-6">
                 <div class="mb-6 relative">
-                    <div class="w-20 h-20 border-4 border-indigo-100 rounded-full animate-spin"></div>
-                    <div class="w-20 h-20 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
-                    <i id="loader-icon" class="fas fa-paper-plane absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-xl"></i>
+                    <div class="w-24 h-24 border-4 border-indigo-100 rounded-full"></div>
+                    <div class="w-24 h-24 border-4 border-t-indigo-600 rounded-full animate-spin absolute top-0 left-0"></div>
+                    <i id="loader-icon" class="fas fa-paper-plane absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-indigo-600 text-2xl"></i>
                 </div>
                 
-                <h3 id="loader-title" class="text-lg font-black text-gray-900 leading-6 mb-2">Enviando Correos...</h3>
-                <div class="space-y-2">
-                    <p id="loader-desc" class="text-sm text-gray-500">
-                        Procesando <strong>{{ total_count }}</strong> destinatarios.
-                    </p>
-                    <p id="loader-sub" class="text-xs text-gray-400">Por favor esperar, no cierres la ventana.</p>
+                <h3 id="loader-title" class="text-xl font-black text-gray-900 leading-6 mb-2">Enviando Correos...</h3>
+                <p id="loader-desc" class="text-sm text-gray-500">
+                    Iniciando proceso de envío masivo.
+                </p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progress-container" class="mb-8 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Progreso</span>
+                    <span id="progress-percent" class="text-xs font-black text-indigo-600">0%</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
                 </div>
             </div>
+
+            <!-- Stats Grid -->
+            <div id="stats-container" class="grid grid-cols-3 gap-4 mb-8 hidden">
+                <div class="bg-green-50 p-3 rounded-lg text-center border border-green-100">
+                    <div id="stat-sent" class="text-xl font-bold text-green-700">0</div>
+                    <div class="text-[10px] uppercase font-bold text-green-600">Enviados</div>
+                </div>
+                <div class="bg-red-50 p-3 rounded-lg text-center border border-red-100">
+                    <div id="stat-failed" class="text-xl font-bold text-red-700">0</div>
+                    <div class="text-[10px] uppercase font-bold text-red-600">Fallidos</div>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg text-center border border-blue-100">
+                    <div id="stat-pending" class="text-xl font-bold text-blue-700">0</div>
+                    <div class="text-[10px] uppercase font-bold text-blue-600">Pendientes</div>
+                </div>
+            </div>
+
+            <!-- Warning/Info -->
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-3 mb-6 rounded-r-md">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-amber-500 text-sm"></i>
+                    </div>
+                    <div class="ml-3">
+                         <p class="text-xs text-amber-900 font-medium">Por favor, NO cierres esta ventana.</p>
+                         <p class="text-xs text-amber-700 mt-1">El sistema envía los correos uno a uno para seguridad.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boton Cancelar -->
+            <div class="text-center">
+                 <button type="button" onclick="cancelCampaign()" class="text-red-600 hover:text-red-800 text-xs font-medium underline">
+                    <i class="fas fa-stop-circle mr-1"></i> Cancelar Envío
+                </button>
+            </div>
+
         </div>
     </div>
 </div>
@@ -312,51 +358,149 @@
 {% block extra_js %}
 <script src="{% static 'js/pages/campaign-preview.js' %}"></script>
 <script>
+    const campaignId = {{ campaign.pk }};
+    let pollingInterval = null;
+
     document.addEventListener('DOMContentLoaded', function() {
-        // Elements
         const loader = document.getElementById('full-screen-loader');
-        const loaderTitle = document.getElementById('loader-title');
-        const loaderDesc = document.getElementById('loader-desc');
         const form = document.getElementById('sendCampaignForm');
         
-        // Handle Submit logic
+        const ui = {
+            title: document.getElementById('loader-title'),
+            desc: document.getElementById('loader-desc'),
+            bar: document.getElementById('progress-bar'),
+            percent: document.getElementById('progress-percent'),
+            sent: document.getElementById('stat-sent'),
+            failed: document.getElementById('stat-failed'),
+            pending: document.getElementById('stat-pending'),
+            progressCont: document.getElementById('progress-container'),
+            statsCont: document.getElementById('stats-container')
+        };
+
         if (form) {
-            form.addEventListener('submit', function(e) {
+            form.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                
-                // 1. Close modal first for visual clarity
                 closeConfirmModal();
+                loader.classList.remove('hidden'); // Mostrar overlay inmediatamente
                 
-                // 2. Show Loader
-                loader.classList.remove('hidden');
-                
-                // 3. Wait and Submit
-                setTimeout(() => {
-                    this.submit();
-                }, 300);
+                try {
+                    // Enviar petición AJAX
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Mostrar UI de progreso
+                        ui.progressCont.classList.remove('hidden');
+                        ui.statsCont.classList.remove('hidden');
+                        ui.title.textContent = 'Procesando Envío...';
+                        ui.desc.textContent = 'Conectando con el servidor de correos.';
+                        
+                        // Iniciar Polling
+                        startPolling();
+                    } else {
+                        throw new Error('Error al iniciar el envío');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Error: ' + error.message);
+                    loader.classList.add('hidden');
+                }
             });
+        }
+        
+        async function updateProgress() {
+            try {
+                const res = await fetch(`/correo/api/campaign/${campaignId}/progress/`);
+                const data = await res.json();
+                
+                if (data.error) return;
+
+                // Actualizar UI
+                const p = data.progress || 0;
+                ui.bar.style.width = p + '%';
+                ui.percent.textContent = p + '%';
+                
+                ui.sent.textContent = data.sent;
+                ui.failed.textContent = data.failed;
+                ui.pending.textContent = data.pending;
+                ui.desc.textContent = `Procesando correo ${data.sent + data.failed + 1} de ${data.total} | Enviando secuencialmente...`;
+
+                // Mostrar errores si existen
+                if (data.recent_errors && data.recent_errors.length > 0) {
+                    let errorHtml = '<ul class="mt-2 text-xs text-red-600 text-left list-disc list-inside">';
+                    data.recent_errors.forEach(err => {
+                        errorHtml += `<li><strong>${err[0]}:</strong> ${err[1].substring(0, 50)}...</li>`;
+                    });
+                    errorHtml += '</ul>';
+                    
+                    // Solo agregar si no existe ya para evitar parpadeo feo
+                    if (!document.getElementById('error-list-container')) {
+                        const statsDiv = document.getElementById('stats-container');
+                        const errorDiv = document.createElement('div');
+                        errorDiv.id = 'error-list-container';
+                        errorDiv.className = 'col-span-3 bg-red-50 p-2 rounded border border-red-200 mt-2';
+                        errorDiv.innerHTML = '<p class="font-bold text-xs text-red-700">Últimos errores:</p>' + errorHtml;
+                        statsDiv.appendChild(errorDiv);
+                    } else {
+                         document.getElementById('error-list-container').innerHTML = '<p class="font-bold text-xs text-red-700">Últimos errores:</p>' + errorHtml;
+                    }
+                }
+
+                // Verificar si terminó
+                if (data.is_complete || data.status === 'completed' || data.status === 'cancelled') {
+                    stopPolling();
+                    ui.bar.style.width = '100%';
+                    ui.percent.textContent = '100%';
+                    ui.title.textContent = '¡Proceso Finalizado!';
+                    ui.desc.textContent = 'Redirigiendo a resultados...';
+                    
+                    setTimeout(() => {
+                        window.location.href = `/correo/detalle/${campaignId}/`;
+                    }, 1500);
+                }
+
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        }
+
+        function startPolling() {
+            updateProgress(); // Primera llamada inmediata
+            pollingInterval = setInterval(updateProgress, 2000);
+        }
+
+        function stopPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+        }
+        
+        window.cancelCampaign = async function() {
+            if (!confirm('¿Seguro que deseas detener el envío?')) return;
+            
+            try {
+                await fetch(`/correo/cancelar/${campaignId}/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': '{{ csrf_token }}'}
+                });
+                alert('Envío cancelado.');
+                stopPolling();
+                window.location.href = `/correo/detalle/${campaignId}/`;
+            } catch (e) {
+                alert('Error al cancelar');
+            }
         }
     });
 
-    // Helper functions (kept inline or moved from js file if needed, 
-    // but relying on existing js file for grid logic is fine, 
-    // only modals need overrides if they were conflicting)
-    
-    window.openConfirmModal = function() {
-        document.getElementById('confirmModal').classList.remove('hidden');
-    }
-
-    window.closeConfirmModal = function() {
-        document.getElementById('confirmModal').classList.add('hidden');
-    }
-    
-    // Existing functions for Recipients Modal should be in campaign-preview.js 
-    // or we can ensure they are available here if missing.
-    window.openRecipientsModal = function() {
-       document.getElementById('recipientsModal').classList.remove('hidden'); 
-    }
-    window.closeRecipientsModal = function() {
-       document.getElementById('recipientsModal').classList.add('hidden'); 
-    }
+    // Modals Helpers (se mantienen igual)
+    window.openConfirmModal = function() { document.getElementById('confirmModal').classList.remove('hidden'); }
+    window.closeConfirmModal = function() { document.getElementById('confirmModal').classList.add('hidden'); }
+    window.openRecipientsModal = function() { document.getElementById('recipientsModal').classList.remove('hidden'); }
+    window.closeRecipientsModal = function() { document.getElementById('recipientsModal').classList.add('hidden'); }
 </script>
 {% endblock %}

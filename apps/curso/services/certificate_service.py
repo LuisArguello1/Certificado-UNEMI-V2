@@ -11,17 +11,32 @@ from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
 
 # Try importing WeasyPrint, handle if missing to prevent immediate crash during dev
+# Try importing WeasyPrint, handle if missing to prevent immediate crash during dev
 try:
     from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
 except ImportError:
     HTML = None
+    FontConfiguration = None
 
 class CertificateService:
     """
     Motor de renderizado de certificados usando WeasyPrint.
     Convierte el JSON del editor visual a un layout HTML/CSS idéntico
     y genera el PDF final preservando fidelidad visual.
+    
+    OPTIMIZACIÓN: Usa FontConfiguration cacheado para evitar re-escaneo de tipografías 
+    en cada generación masiva.
     """
+    
+    _font_config = None # Cache a nivel de clase
+
+    @classmethod
+    def get_font_config(cls):
+        if cls._font_config is None and FontConfiguration:
+            # Instanciar una sola vez para todo el ciclo de vida del proceso worker
+            cls._font_config = FontConfiguration()
+        return cls._font_config
     
     @staticmethod
     def format_date_es(date):
@@ -63,8 +78,8 @@ class CertificateService:
             
         return full_name
 
-    @staticmethod
-    def generate_pdf(certificado):
+    @classmethod
+    def generate_pdf(cls, certificado):
         # Verificación de librería
         if not HTML:
             print("CRITICAL: WeasyPrint no está instalado.")
@@ -88,9 +103,9 @@ class CertificateService:
             'NOMBRE DEL CURSO': curso.nombre.strip().upper(),
             'CEDULA': estudiante.cedula,
             'RESPONSABLE': curso.responsable.strip(),
-            'FECHA_INICIO': CertificateService.format_date_es(curso.fecha_inicio),
-            'FECHA_FIN': CertificateService.format_date_es(curso.fecha_fin),
-            'FECHA_EMISION': CertificateService.format_date_es(certificado.fecha_generacion),
+            'FECHA_INICIO': cls.format_date_es(curso.fecha_inicio),
+            'FECHA_FIN': cls.format_date_es(curso.fecha_fin),
+            'FECHA_EMISION': cls.format_date_es(certificado.fecha_generacion),
         }
 
         # --- BACKGROUND & DIMENSIONS ---
@@ -130,7 +145,7 @@ class CertificateService:
             if 'NOMBRE DEL ESTUDIANTE' in replacements or '[NOMBRE DEL ESTUDIANTE]' in content:
                 # Determine format mode for this specific block
                 fmt_mode = block.get('name_format', 'full')
-                formatted_name = CertificateService.format_name(estudiante.nombre_completo.strip().upper(), fmt_mode)
+                formatted_name = cls.format_name(estudiante.nombre_completo.strip().upper(), fmt_mode)
                 
                 content = content.replace('{NOMBRE DEL ESTUDIANTE}', formatted_name)
                 content = content.replace('[NOMBRE DEL ESTUDIANTE]', formatted_name)
@@ -249,41 +264,10 @@ class CertificateService:
                     'src': src
                 })
                 
-                # DEBUG: Log font mapping
-                print(f"[FONT DEBUG] Block {block_id}: {raw_font} -> {font_family_clean} -> {final_font}")
+                # DEBUG REMOVED to avoid I/O blocking
 
             except Exception as e:
                 print(f"Error procesando bloque {block_id}: {e}")
-
-        # --- QR CODE GENERATION (DISABLED) ---
-        qr_data = None
-        # try:
-        #     ver_url = f"https://certificados.unemi.edu.ec/verificar/{certificado.codigo_verificacion}/"
-        #     qr = qrcode.QRCode(version=1, box_size=1, border=0)
-        #     qr.add_data(ver_url)
-        #     qr.make(fit=True)
-        #     qr_img = qr.make_image(fill_color="black", back_color="white")
-        #     
-        #     qr_buffer = io.BytesIO()
-        #     qr_img.save(qr_buffer, format='PNG')
-        #     qr_base64 = base64.b64encode(qr_buffer.getvalue()).decode('utf-8')
-        #     
-        #     # Tamaño QR: 8% del ancho
-        #     qr_target_size = img_w * 0.08
-        #     qr_margin = img_w * 0.05
-        #     
-        #     qr_x = img_w - qr_target_size - qr_margin
-        #     qr_y = img_h - qr_target_size - (img_h * 0.05)
-        #     
-        #     qr_data = {
-        #         'image': qr_base64,
-        #         'x': f"{qr_x:.2f}",
-        #         'y': f"{qr_y:.2f}",
-        #         'width': f"{qr_target_size:.2f}"
-        #     }
-        #
-        # except Exception as e:
-        #     print(f"Error generando QR: {e}")
 
         # --- HTML RENDER ---
         context = {
@@ -291,15 +275,22 @@ class CertificateService:
             'height': img_h,
             'bg_uri': bg_uri, # Usamos bg_uri en lugar de path raw
             'blocks': render_blocks,
-            'qr_data': qr_data
+            'qr_data': None
         }
         
         html_string = render_to_string('curso/certificate/pdf_render.html', context)
 
         # --- PDF GENERATION ---
         buffer = io.BytesIO()
+        
+        # Uso de caché de FontConfiguration para velocidad
+        font_config = cls.get_font_config()
+        
         # base_url debe ser un path de directorio
-        HTML(string=html_string, base_url=str(Path(settings.MEDIA_ROOT))).write_pdf(target=buffer)
+        HTML(string=html_string, base_url=str(Path(settings.MEDIA_ROOT))).write_pdf(
+            target=buffer,
+            font_config=font_config  # Inject cached font config
+        )
         
         # --- SAVING ---
         try:

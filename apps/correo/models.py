@@ -4,6 +4,8 @@ Modelos para la app Correo.
 Gestiona campañas de correo masivo y destinatarios, vinculándolos a los Cursos.
 """
 from django.db import models
+from django.utils import timezone
+from datetime import date
 from apps.curso.models import Curso
 
 class EmailCampaign(models.Model):
@@ -16,6 +18,7 @@ class EmailCampaign(models.Model):
         ('processing', 'Procesando'),
         ('completed', 'Completado'),
         ('failed', 'Fallido'),
+        ('cancelled', 'Cancelado'),
     ]
     
     course = models.ForeignKey(
@@ -43,6 +46,24 @@ class EmailCampaign(models.Model):
         verbose_name='Estado'
     )
     
+    # Campos para tracking de Celery y progreso
+    celery_task_id = models.CharField(
+        max_length=255, 
+        null=True, 
+        blank=True, 
+        verbose_name='ID de tarea Celery'
+    )
+    progress = models.IntegerField(
+        default=0, 
+        verbose_name='Progreso (%)',
+        help_text='Porcentaje de progreso de 0 a 100'
+    )
+    current_batch = models.IntegerField(
+        default=0, 
+        verbose_name='Lote actual',
+        help_text='Número del lote que se está procesando actualmente'
+    )
+    
     total_recipients = models.IntegerField(default=0, verbose_name='Total de destinatarios')
     sent_count = models.IntegerField(default=0, verbose_name='Correos enviados')
     failed_count = models.IntegerField(default=0, verbose_name='Correos fallidos')
@@ -63,6 +84,38 @@ class EmailCampaign(models.Model):
         self.sent_count = self.recipients.filter(status='sent').count()
         self.failed_count = self.recipients.filter(status='failed').count()
         self.save()
+    
+    def get_progress_data(self):
+        """Retorna datos de progreso para la API."""
+        total = self.total_recipients
+        sent = self.sent_count
+        failed = self.failed_count
+        pending = self.recipients.filter(status='pending').count()
+        
+        # Calcular progreso basado en correos procesados (enviados + fallidos)
+        processed = sent + failed
+        if total > 0:
+            progress_percent = int((processed / total) * 100)
+        else:
+            progress_percent = 0
+        
+        # Obtener últimos errores si hay fallidos
+        recent_errors = []
+        if failed > 0:
+            recent_errors = list(self.recipients.filter(status='failed')
+                                 .values_list('email', 'error_message')[:3])
+
+        return {
+            'status': self.status,
+            'progress': progress_percent,
+            'sent': sent,
+            'failed': failed,
+            'pending': pending,
+            'total': total,
+            'current_batch': self.current_batch,
+            'is_complete': self.status in ['completed', 'failed', 'cancelled'],
+            'recent_errors': recent_errors
+        }
 
 
 class EmailRecipient(models.Model):
@@ -104,3 +157,73 @@ class EmailRecipient(models.Model):
     
     def __str__(self):
         return f"{self.full_name} - {self.email}"
+
+
+class EmailDailyLimit(models.Model):
+    """
+    Modelo para tracking del límite diario de envío de correos.
+    Se usa para evitar exceder el límite impuesto por el servidor SMTP.
+    """
+    date = models.DateField(
+        unique=True, 
+        default=date.today,
+        verbose_name='Fecha'
+    )
+    count = models.IntegerField(
+        default=0, 
+        verbose_name='Correos enviados'
+    )
+    
+    class Meta:
+        verbose_name = 'Límite diario de correos'
+        verbose_name_plural = 'Límites diarios de correos'
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.date}: {self.count} correos enviados"
+    
+    @classmethod
+    def can_send_email(cls):
+        """
+        Verifica si aún se puede enviar un correo sin exceder el límite diario.
+        
+        Returns:
+            bool: True si se puede enviar, False si se alcanzó el límite
+        """
+        from django.conf import settings
+        
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        
+        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        
+        return limit_record.count < daily_limit
+    
+    @classmethod
+    def increment_count(cls):
+        """
+        Incrementa el contador de correos enviados hoy.
+        """
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        limit_record.count += 1
+        limit_record.save()
+        return limit_record.count
+    
+    @classmethod
+    def get_remaining_today(cls):
+        """
+        Obtiene la cantidad de correos que aún se pueden enviar hoy.
+        
+        Returns:
+            int: Cantidad de correos restantes
+        """
+        from django.conf import settings
+        
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        
+        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        remaining = daily_limit - limit_record.count
+        
+        return max(0, remaining)

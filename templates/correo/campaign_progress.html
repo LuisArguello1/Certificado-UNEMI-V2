@@ -1,0 +1,236 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Progreso de Envío{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center">
+                <i class="fas fa-paper-plane mr-3 text-blue-600"></i>
+                Envío en Progreso
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">Campaña: <strong>{{ campaign.name }}</strong></p>
+        </div>
+    </div>
+
+    <!-- Progress Card -->
+    <div class="bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+            <h3 class="text-lg font-semibold text-white flex items-center">
+                <i class="fas fa-chart-line mr-2"></i>
+                Progreso de Envío
+            </h3>
+        </div>
+
+        <div class="p-8">
+            <!-- Progress Bar -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-700">Progreso del envío</span>
+                    <span id="progressPercent" class="text-sm font-bold text-blue-600">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
+                    <div class="text-2xl font-bold text-gray-800" id="totalCount">{{ campaign.total_recipients }}</div>
+                    <div class="text-xs text-gray-500 uppercase font-medium mt-1">Total</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4 text-center border border-green-200">
+                    <div class="text-2xl font-bold text-green-700" id="sentCount">{{ campaign.sent_count }}</div>
+                    <div class="text-xs text-green-600 uppercase font-medium mt-1">Enviados</div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-4 text-center border border-red-200">
+                    <div class="text-2xl font-bold text-red-700" id="failedCount">{{ campaign.failed_count }}</div>
+                    <div class="text-xs text-red-600 uppercase font-medium mt-1">Fallidos</div>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-4 text-center border border-blue-200">
+                    <div class="text-2xl font-bold text-blue-700" id="pendingCount">-</div>
+                    <div class="text-xs text-blue-600 uppercase font-medium mt-1">Pendientes</div>
+                </div>
+            </div>
+
+            <!-- Status Message -->
+            <div id="statusMessage" class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                <div class="flex items-center">
+                    <i class="fas fa-info-circle text-blue-400 mr-3"></i>
+                    <div>
+                        <p class="text-sm font-medium text-blue-800">Procesando campaña...</p>
+                        <p class="text-xs text-blue-600 mt-1" id="statusDetail">Inicializando envío por lotes</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Batch Info -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-medium mb-1">Lote Actual</p>
+                        <p class="text-lg font-bold text-gray-800" id="currentBatch">-</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                        <span class="text-sm text-gray-600">En proceso</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="cancelBtn" onclick="cancelCampaign()" class="flex-1 px-4 py-3 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all">
+                    <i class="fas fa-stop-circle mr-2"></i> Cancelar Envío
+                </button>
+                <a href="{% url 'correo:detail' campaign.pk %}" id="viewDetailsBtn" class="hidden flex-1 px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all text-center">
+                    <i class="fas fa-eye mr-2"></i> Ver Detalles
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+            <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+            Información Importante
+        </h4>
+        <ul class="text-xs text-gray-600 space-y-1 list-disc list-inside">
+            <li>El envío se realiza en lotes de 10 correos para evitar bloqueos</li>
+            <li>Se espera 2 segundos entre cada correo para respetar límites del servidor</li>
+            <li>Límite diario: 400 correos máximo</li>
+            <li>Puedes cerrar esta página sin afectar el proceso de envío</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const campaignId = {{ campaign.pk }};
+let pollingInterval = null;
+let isComplete = false;
+
+async function updateProgress() {
+    try {
+        const response = await fetch(`/correo/api/campaign/${campaignId}/progress/`);
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error:', data.error);
+            return;
+        }
+        
+        // Update progress bar
+        const progress = data.progress || 0;
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('progressPercent').textContent = progress + '%';
+        
+        // Update stats
+        document.getElementById('totalCount').textContent = data.total || 0;
+        document.getElementById('sentCount').textContent = data.sent || 0;
+        document.getElementById('failedCount').textContent = data.failed || 0;
+        document.getElementById('pendingCount').textContent = data.pending || 0;
+        document.getElementById('currentBatch').textContent = data.current_batch || '-';
+        
+        // Update status message
+        const statusMessage = document.getElementById('statusMessage');
+        const statusDetail = document.getElementById('statusDetail');
+        
+        if (data.status === 'processing') {
+            statusMessage.className = 'bg-blue-50 border-l-4 border-blue-400 p-4 mb-6';
+            statusDetail.textContent = `Procesando lote ${data.current_batch}... (${data.sent} de ${data.total} enviados)`;
+        } else if (data.status === 'completed') {
+            statusMessage.className = 'bg-green-50 border-l-4 border-green-400 p-4 mb-6';
+            statusDetail.textContent = `¡Campaña completada! ${data.sent} correos enviados exitosamente`;
+        } else if (data.status === 'failed') {
+            statusMessage.className = 'bg-red-50 border-l-4 border-red-400 p-4 mb-6';
+            statusDetail.textContent = `Campaña fallida. ${data.failed} errores detectados`;
+        } else if (data.status === 'cancelled') {
+            statusMessage.className = 'bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6';
+            statusDetail.textContent = 'Campaña cancelada por el usuario';
+        }
+        
+        // Check if complete
+        if (data.is_complete && !isComplete) {
+            isComplete = true;
+            stopPolling();
+            handleComplete(data);
+        }
+        
+    } catch (error) {
+        console.error('Error fetching progress:', error);
+    }
+}
+
+function handleComplete(data) {
+    // Hide cancel button, show view details
+    document.getElementById('cancelBtn').classList.add('hidden');
+    document.getElementById('viewDetailsBtn').classList.remove('hidden');
+    
+    // Auto-redirect after 3 seconds
+    setTimeout(() => {
+        window.location.href = `/correo/detalle/${campaignId}/`;
+    }, 3000);
+}
+
+function startPolling() {
+    // Initial update
+    updateProgress();
+    
+    // Poll every 2 seconds
+    pollingInterval = setInterval(updateProgress, 2000);
+}
+
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
+async function cancelCampaign() {
+    if (!confirm('¿Estás seguro de que deseas cancelar el envío? Los correos ya enviados no se pueden revertir.')) {
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        const response = await fetch(`/correo/cancelar/${campaignId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        
+        if (response.ok) {
+            alert('Campaña cancelada exitosamente');
+            updateProgress();
+        } else {
+            alert('Error al cancelar la campaña');
+        }
+    } catch (error) {
+        console.error('Error canceling campaign:', error);
+        alert('Error al cancelar la campaña');
+    }
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startPolling();
+});
+
+// Stop polling when page unloads
+window.addEventListener('beforeunload', function() {
+    stopPolling();
+});
+</script>
+{% endblock %}
