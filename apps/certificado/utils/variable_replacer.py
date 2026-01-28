@@ -53,7 +53,6 @@ class VariableReplacer:
         try:
             # Cargar documento
             doc = Document(doc_path)
-            logger.info(f"Documento cargado: {doc_path}")
             
             # Normalizar variables (asegurar mayúsculas)
             variables_upper = {k.upper(): v for k, v in variables.items()}
@@ -72,7 +71,6 @@ class VariableReplacer:
                 VariableReplacer._replace_in_paragraphs(section.header.paragraphs, variables_upper)
                 VariableReplacer._replace_in_paragraphs(section.footer.paragraphs, variables_upper)
             
-            logger.info(f"Variables reemplazadas exitosamente")
             return doc
             
         except Exception as e:
@@ -94,77 +92,113 @@ class VariableReplacer:
     @staticmethod
     def _replace_in_paragraph(paragraph, variables: Dict[str, str]):
         """
-        Reemplaza variables en un solo párrafo, preservando el formato.
-        
-        Args:
-            paragraph: Párrafo de python-docx
-            variables: Diccionario de reemplazos
+        Reemplaza variables en un solo párrafo, preservando el formato por partes
+        y aplicando negritas a variables específicas (como el nombre del evento).
         """
-        # Obtener todo el texto del párrafo
         full_text = paragraph.text
-        
-        # Si no hay variables, salir
         if '{{' not in full_text:
             return
+
+        # Variables que deben ir en NEGRITA
+        BOLD_VARIABLES = ['NOMBRE_EVENTO', 'NOMBRE CURSO', 'TIPO_EVENTO', 'TIPO DE EVENTO']
         
-        # Buscar todas las variables en el texto
-        variables_found = VariableReplacer.VARIABLE_PATTERN.findall(full_text)
+        # 1. Guardar propiedades físicas del párrafo
+        p_format = paragraph.paragraph_format
+        alignment = p_format.alignment
         
-        if not variables_found:
-            return
-        
-        # Reemplazar cada variable
-        new_text = full_text
-        for var_name in variables_found:
-            placeholder = f'{{{{{var_name}}}}}'
-            
-            if var_name in variables:
-                # Reemplazar con valor
-                replacement = str(variables[var_name])
-                new_text = new_text.replace(placeholder, replacement)
-                logger.debug(f"Reemplazado: {placeholder} → {replacement}")
-            else:
-                # Variable no encontrada, dejar como está y loggear
-                logger.warning(f"Variable no encontrada: {placeholder}")
-        
-        # Si hubo cambios, actualizar el párrafo
-        if new_text != full_text:
-            VariableReplacer._update_paragraph_text(paragraph, new_text)
-    
-    @staticmethod
-    def _update_paragraph_text(paragraph, new_text: str):
-        """
-        Actualiza el texto de un párrafo preservando el formato del primer run.
-        
-        Args:
-            paragraph: Párrafo de python-docx
-            new_text: Nuevo texto
-        """
-        # Guardar formato del primer run si existe
-        first_run_font = None
+        # 2. Guardar formato base del primer run (referencia)
+        base_format = {}
         if paragraph.runs:
-            first_run_font = paragraph.runs[0].font
-        
-        # Limpiar todos los runs
-        for run in paragraph.runs:
-            run.text = ''
-        
-        # Eliminar runs vacíos
+            r = paragraph.runs[0]
+            base_format = {
+                'name': r.font.name,
+                'size': r.font.size,
+                'bold': r.font.bold,
+                'italic': r.font.italic,
+                'underline': r.font.underline,
+                'color': r.font.color.rgb if r.font.color and r.font.color.rgb else None
+            }
+
+        # 3. Reemplazo preciso
+        # Usamos regex para encontrar placeholders {{...}}
+        import re
+        parts = re.split(r'(\{\{[A-Z_ ]+\}\})', full_text)
+        if len(parts) <= 1:
+            return
+
+        # 4. Limpiar runs actuales pero mantener formato de párrafo
+        # paragraph.clear() es efectivo pero a veces resetea la alineación si NO está en el estilo
         paragraph.clear()
         
-        # Agregar nuevo run con el texto actualizado
-        new_run = paragraph.add_run(new_text)
+        # 5. Reconstruir runs con los reemplazos
+        for part in parts:
+            if not part: continue
+            
+            # Es un placeholder?
+            if part.startswith('{{') and part.endswith('}}'):
+                var_name = part[2:-2].strip().upper()
+                if var_name in variables:
+                    val = str(variables[var_name])
+                    run = paragraph.add_run(val)
+                    
+                    if base_format:
+                        run.font.name = base_format['name']
+                        run.font.size = base_format['size']
+                        run.font.italic = base_format['italic']
+                        run.font.underline = base_format['underline']
+                        if base_format['color']: run.font.color.rgb = base_format['color']
+                        
+                        # Formato especial por variable
+                        if var_name in BOLD_VARIABLES:
+                            run.font.bold = True
+                        elif var_name == 'NOMBRES':
+                            run.font.bold = True
+                            run.font.size = Pt(26)  # Nombre grande e impactante
+                        else:
+                            run.font.bold = base_format['bold']
+                else:
+                    # Variable no proporcionada, dejar el placeholder
+                    run = paragraph.add_run(part)
+                    if base_format: run.font.bold = base_format['bold']
+            else:
+                # Texto normal
+                run = paragraph.add_run(part)
+                if base_format:
+                    run.font.name = base_format['name']
+                    run.font.size = base_format['size']
+                    run.font.bold = base_format['bold']
+                    run.font.italic = base_format['italic']
+                    run.font.underline = base_format['underline']
+                    if base_format['color']: run.font.color.rgb = base_format['color']
+
+        # 6. APLICAR AJUSTES DE DISEÑO ESPECÍFICOS SEGÚN VARIABLES DETECTADAS
+        # Sangrías para el párrafo descriptivo (Participación)
+        HAS_DESCRIPTION = any(v in full_text for v in ['NOMBRE_EVENTO', 'NOMBRE CURSO'])
+        HAS_OBJECTIVE = any(v in full_text for v in ['OBJETIVO_PROGRAMA', 'OBJETIVO DEL PROGRAMA'])
         
-        # Aplicar formato del run original si existía
-        if first_run_font:
-            new_run.font.name = first_run_font.name
-            new_run.font.size = first_run_font.size
-            new_run.font.bold = first_run_font.bold
-            new_run.font.italic = first_run_font.italic
-            new_run.font.underline = first_run_font.underline
-            new_run.font.color.rgb = first_run_font.color.rgb
+        if HAS_DESCRIPTION:
+            # Aumento máximo de sangrías (100pt) para un centrado perfecto del bloque
+            paragraph.paragraph_format.left_indent = Pt(80)
+            paragraph.paragraph_format.right_indent = Pt(80)
+            # Forzar justificado para bloque limpio
+            paragraph.alignment = 3 # JUSTIFY
 
+        if HAS_OBJECTIVE or any(v in full_text for v in ['CONTENIDO', 'CONTENIDO DEL PROGRAMA']):
+            # Interlineado ultra-compacto (0.8) para descripciones largas de objetivos/contenido
+            paragraph.paragraph_format.line_spacing = 0.8
+            # Eliminar todos los espacios extra
+            paragraph.paragraph_format.space_before = Pt(0)
+            paragraph.paragraph_format.space_after = Pt(0)
 
+        # 7. Forzar restauración de la alineación original si no entramos en los casos anteriores
+        if not HAS_DESCRIPTION:
+            if alignment is not None:
+                paragraph.alignment = alignment
+            elif paragraph.style and paragraph.style.paragraph_format.alignment is not None:
+                paragraph.alignment = paragraph.style.paragraph_format.alignment
+    
+
+@staticmethod
 def replace_variables_in_template(template_path: str, variables: Dict[str, str]) -> Document:
     """
     Función helper para reemplazar variables en una plantilla.

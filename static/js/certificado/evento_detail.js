@@ -283,7 +283,8 @@ function startGeneration() {
 function startPolling() {
     if (pollInterval) clearInterval(pollInterval);
 
-    pollInterval = setInterval(() => {
+    // Función helper para obtener y actualizar progreso
+    const checkProgress = () => {
         const formData = new FormData();
         formData.append('action', 'get_progress');
         formData.append('csrfmiddlewaretoken', csrftoken);
@@ -305,47 +306,44 @@ function startPolling() {
                     if (countSuccess) countSuccess.textContent = data.exitosos;
                     if (countFailed) countFailed.textContent = data.fallidos;
 
-                    // Actualizar loading overlay si está activo o activarlo si es necesario
+                    // Actualizar loading overlay si está activo
                     if (window.loadingOverlay) {
                         // Si el overlay está oculto pero estamos procesando, mostrarlo (caso recarga de página)
-                        if (window.loadingOverlay.overlay && window.loadingOverlay.overlay.classList.contains('hidden')) {
-                            window.loadingOverlay.show('Retomando generación...');
+                        if (data.status === 'processing' && window.loadingOverlay.overlay.classList.contains('hidden')) {
+                            window.loadingOverlay.show('Procesando certificados...');
                         }
 
-                        window.loadingOverlay.updateProgress(
-                            progress,
-                            data.exitosos || 0,
-                            data.fallidos || 0
-                        );
-
-                        if (progress > 0) {
+                        // Actualizar mensaje con progreso si está visible
+                        if (!window.loadingOverlay.overlay.classList.contains('hidden')) {
                             window.loadingOverlay.updateMessage(
-                                `Procesando certificados... ${progress}% completado`
+                                `Procesando certificados: ${data.exitosos} de ${data.total} completados (${progress}%)`
                             );
+                            window.loadingOverlay.updateProgress(progress, data.exitosos, data.fallidos);
                         }
                     }
 
-                    // Si completó, detener polling y recargar
+                    // Si está completo, detener polling y recargar
                     if (data.is_complete) {
                         clearInterval(pollInterval);
-                        showToast("PROCESAMIENTO FINALIZADO");
-
                         if (window.loadingOverlay) {
-                            window.loadingOverlay.updateMessage('¡Procesamiento completado! Recargando...');
-                            setTimeout(() => {
-                                window.loadingOverlay.hide();
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            setTimeout(() => window.location.reload(), 2000);
+                            window.loadingOverlay.updateMessage('¡Generación completada! Recargando página...');
                         }
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
                     }
                 }
             })
             .catch(error => {
-                console.error('Error en polling:', error);
+                console.error('Error al consultar progreso:', error);
             });
-    }, 3000);
+    };
+
+    // Ejecutar inmediatamente la primera vez
+    checkProgress();
+
+    // Luego continuar con intervalo de 1 segundo
+    pollInterval = setInterval(checkProgress, 1000);
 }
 
 /**

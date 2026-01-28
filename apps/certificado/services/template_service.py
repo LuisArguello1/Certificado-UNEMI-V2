@@ -61,8 +61,6 @@ class TemplateService:
             if not os.path.exists(template_path):
                 raise FileNotFoundError(f"Plantilla no encontrada: {template_path}")
             
-            logger.info(f"Generando DOCX desde plantilla: {template_path}")
-            
             # Importar utilidad de reemplazo
             from ..utils.variable_replacer import replace_variables_in_template
             
@@ -73,11 +71,9 @@ class TemplateService:
             output_dir = os.path.dirname(output_path)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir, exist_ok=True)
-                logger.info(f"Directorio creado: {output_dir}")
             
             # Guardar documento
             doc.save(output_path)
-            logger.info(f"DOCX generado exitosamente: {output_path}")
             
             # Validar que se creó el archivo
             if not os.path.exists(output_path):
@@ -112,36 +108,51 @@ class TemplateService:
                 ...
             }
         """
+        # Diccionario para meses en español (Capitalizados para el formato del usuario)
+        meses = {
+            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+        }
+
+        def format_fecha_es(fecha):
+            if not fecha: return ''
+            return f"{fecha.day} de {meses[fecha.month]} de {fecha.year}"
+
         # Formatear fechas
-        fecha_inicio_str = evento.fecha_inicio.strftime('%d de %B de %Y') if evento.fecha_inicio else ''
-        fecha_fin_str = evento.fecha_fin.strftime('%d de %B de %Y') if evento.fecha_fin else ''
-        fecha_emision_str = evento.fecha_emision.strftime('%d de %B de %Y') if evento.fecha_emision else ''
+        fecha_inicio_str = format_fecha_es(evento.fecha_inicio)
+        fecha_fin_str = format_fecha_es(evento.fecha_fin)
+        fecha_emision_str = format_fecha_es(evento.fecha_emision)
+        
+        # Partes de la fecha para mayor flexibilidad
+        dia_emision = str(evento.fecha_emision.day) if evento.fecha_emision else ''
+        mes_emision = meses[evento.fecha_emision.month] if evento.fecha_emision else ''
+        anio_emision = str(evento.fecha_emision.year) if evento.fecha_emision else ''
+        mes_anio_emision = f"{mes_emision} de {anio_emision}" if evento.fecha_emision else ''
         
         # Construir diccionario con todas las variables universales
-        # IMPORTANTE: Incluir todas las variaciones de nombres que se usan en los templates
         variables = {
-            'NOMBRES': estudiante.nombres_completos,
+            'NOMBRES': estudiante.nombres_completos.upper(),
             'MODALIDAD': evento.modalidad.nombre if evento.modalidad else '',
             'NOMBRE_EVENTO': evento.nombre_evento,
-            'NOMBRE CURSO': evento.nombre_evento,  # Variación usada en templates
+            'NOMBRE CURSO': evento.nombre_evento,
             'DURACION': f'{evento.duracion_horas}' if evento.duracion_horas else '0',
-            'HORAS': f'{evento.duracion_horas}' if evento.duracion_horas else '0',  # Variación usada en templates
+            'HORAS': f'{evento.duracion_horas}' if evento.duracion_horas else '0',
             'FECHA_INICIO': fecha_inicio_str,
             'FECHA_FIN': fecha_fin_str,
             'TIPO': evento.tipo.nombre if evento.tipo else '',
             'TIPO_EVENTO': evento.tipo_evento.nombre if evento.tipo_evento else '',
-            'TIPO DE EVENTO': evento.tipo_evento.nombre if evento.tipo_evento else '',  # Variación usada en templates
+            'TIPO DE EVENTO': evento.tipo_evento.nombre if evento.tipo_evento else '',
             'FECHA_EMISION': fecha_emision_str,
-            'FECHA DE EMISION': fecha_emision_str,  # Variación usada en templates
+            'FECHA DE EMISION': fecha_emision_str,
+            'DIA_EMISION': dia_emision,
+            'MES_EMISION': mes_emision,
+            'ANIO_EMISION': anio_emision,
+            'MES_ANIO_EMISION': mes_anio_emision,
             'OBJETIVO_PROGRAMA': evento.objetivo_programa if evento.objetivo_programa else '',
-            'OBJETIVO DEL PROGRAMA': evento.objetivo_programa if evento.objetivo_programa else '',  # Variación usada en templates
+            'OBJETIVO DEL PROGRAMA': evento.objetivo_programa if evento.objetivo_programa else '',
             'CONTENIDO': evento.contenido_programa if evento.contenido_programa else '',
         }
         
-        # Logging detallado para debugging
-        logger.info(f"[Variable Check] Estudiante: {estudiante.nombres_completos}")
-        logger.info(f"[Variable Check] TIPO: '{variables['TIPO']}' (evento.tipo: {evento.tipo})")
-        logger.info(f"[Variable Check] TIPO DE EVENTO: '{variables['TIPO DE EVENTO']}' (evento.tipo_evento: {evento.tipo_evento})")
-        logger.info(f"[Variable Check] FECHA DE EMISION: '{variables['FECHA DE EMISION']}' (evento.fecha_emision: {evento.fecha_emision})")
-        logger.debug(f"Variables construidas para estudiante {estudiante.id}: {list(variables.keys())}")
+        # Variables construidas
         return variables

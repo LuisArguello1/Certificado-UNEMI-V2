@@ -54,12 +54,7 @@ class TemplateSelector:
         # Caso 1: Si hay variante seleccionada, usar esa
         if evento.plantilla_seleccionada and evento.plantilla_seleccionada.activo:
             if evento.plantilla_seleccionada.archivo:
-                template_path = evento.plantilla_seleccionada.archivo.path
-                logger.info(
-                    f"Usando variante de plantilla: {evento.plantilla_seleccionada.nombre} "
-                    f"para evento {evento.id}"
-                )
-                return template_path
+                return evento.plantilla_seleccionada.archivo.path
             else:
                 logger.warning(
                     f"Variante {evento.plantilla_seleccionada.id} no tiene archivo. "
@@ -79,12 +74,7 @@ class TemplateSelector:
                     f"no tiene archivo asociado."
                 )
             
-            template_path = plantilla_base.archivo.path
-            logger.info(
-                f"Usando plantilla base: {plantilla_base.nombre} "
-                f"para evento {evento.id}"
-            )
-            return template_path
+            return plantilla_base.archivo.path
             
         except ObjectDoesNotExist:
             raise TemplateNotFoundError(

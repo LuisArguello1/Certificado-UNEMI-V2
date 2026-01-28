@@ -62,64 +62,53 @@ class PDFConversionService:
             # Obtener ruta de LibreOffice desde settings
             libreoffice_path = getattr(settings, 'LIBREOFFICE_PATH', 'soffice')
             
-            # Configurar perfil de usuario único para paralelismo
-            import uuid
-            import shutil
+            # Usar un perfil compartido en lugar de crear uno nuevo cada vez
             import tempfile
-            from urllib.parse import quote
+            shared_profile_dir = os.path.join(tempfile.gettempdir(), "LO_shared_profile")
             
-            # Crear directorio temporal único para esta instancia
-            unique_id = str(uuid.uuid4())
-            user_profile_dir = os.path.join(tempfile.gettempdir(), f"LO_{unique_id}")
+            # Crear el perfil compartido solo si no existe
+            if not os.path.exists(shared_profile_dir):
+                os.makedirs(shared_profile_dir, exist_ok=True)
             
             # Convertir a formato URL file:/// compatible con Windows/Linux
-            # En Windows: C:\Users\...\Temp\LO_xyz -> file:///C:/Users/.../Temp/LO_xyz
-            user_installation_url = f"file:///{user_profile_dir.replace(os.sep, '/')}"
+            user_installation_url = f"file:///{shared_profile_dir.replace(os.sep, '/')}"
             
-            logger.info(f"Convirtiendo DOCX a PDF: {docx_path} (Perfil: {unique_id})")
-            
-            # Comando para LibreOffice headless con perfil personalizado
+            # Comando para LibreOffice headless con perfil compartido y optimizaciones
             command = [
                 libreoffice_path,
                 f"-env:UserInstallation={user_installation_url}",
                 '--headless',
                 '--convert-to', 'pdf',
                 '--outdir', output_dir,
+                '--norestore',  # No restaurar sesión anterior
+                '--nofirststartwizard',  # Sin wizard de primera vez
+                '--nologo',  # Sin logo de splash
+                '--nolockcheck',  # No verificar bloqueos de archivo
                 docx_path
             ]
             
             # Ejecutar comando
-            try:
-                logger.debug(f"Ejecutando comando: {' '.join(command)}")
-                # Usar creación de ventana oculta en Windows para evitar popups
-                startupwu = None
-                if os.name == 'nt':
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                
-                result = subprocess.run(
-                    command,
-                    capture_output=True,
-                    text=True,
-                    timeout=180,  # Timeout aumentado a 180 segundos
-                    startupinfo=startupinfo if os.name == 'nt' else None
+            # Usar creación de ventana oculta en Windows para evitar popups
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=30,  # Timeout optimizado a 30 segundos
+                startupinfo=startupinfo if os.name == 'nt' else None
+            )
+            
+            # Verificar si hubo error
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout
+                logger.error(f"Error en conversión LibreOffice: {error_msg}")
+                raise PDFConversionError(
+                    f"LibreOffice retornó código {result.returncode}: {error_msg}"
                 )
-                
-                # Verificar si hubo error
-                if result.returncode != 0:
-                    error_msg = result.stderr or result.stdout
-                    logger.error(f"Error en conversión LibreOffice: {error_msg}")
-                    raise PDFConversionError(
-                        f"LibreOffice retornó código {result.returncode}: {error_msg}"
-                    )
-                    
-            finally:
-                # Limpiar directorio de perfil temporal siempre
-                if os.path.exists(user_profile_dir):
-                    try:
-                        shutil.rmtree(user_profile_dir, ignore_errors=True)
-                    except Exception as e:
-                        logger.warning(f"No se pudo limpiar directorio temporal {user_profile_dir}: {e}")
             
             # Construir ruta del PDF generado
             docx_filename = os.path.basename(docx_path)
@@ -131,13 +120,11 @@ class PDFConversionService:
                 raise PDFConversionError(
                     f"El PDF no se generó correctamente. Esperado en: {pdf_path}"
                 )
-            
-            logger.info(f"PDF generado exitosamente: {pdf_path}")
             return pdf_path
             
         except subprocess.TimeoutExpired:
             logger.error(f"Timeout al convertir DOCX a PDF: {docx_path}")
-            raise PDFConversionError(f"Timeout al convertir documento (>180s)")
+            raise PDFConversionError(f"Timeout al convertir documento (>30s)")
         except Exception as e:
             logger.error(f"Error al convertir DOCX a PDF: {str(e)}")
             raise

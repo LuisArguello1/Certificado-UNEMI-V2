@@ -346,7 +346,7 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 # =============================================================================
 
 # URL de conexión a Redis
-CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_BROKER_URL = env('REDIS_URL', default='redis://127.0.0.1:6379/0')
 CELERY_RESULT_BACKEND = 'django-db'  # Guardar resultados en BD Django
 
 # Configuración adicional de Celery

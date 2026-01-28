@@ -50,7 +50,6 @@ class CertificateStorageService:
         """
         if not os.path.exists(directory_path):
             os.makedirs(directory_path, exist_ok=True)
-            logger.info(f"Directorio creado: {directory_path}")
     
     @staticmethod
     def save_certificate_files(evento_id: int, estudiante_id: int,
@@ -79,13 +78,11 @@ class CertificateStorageService:
             # Copiar archivos (no mover, para mantener originales si son necesarios)
             if os.path.exists(docx_source_path):
                 shutil.copy2(docx_source_path, docx_dest)
-                logger.info(f"DOCX copiado a: {docx_dest}")
             else:
                 logger.warning(f"DOCX source no encontrado: {docx_source_path}")
             
             if os.path.exists(pdf_source_path):
                 shutil.copy2(pdf_source_path, pdf_dest)
-                logger.info(f"PDF copiado a: {pdf_dest}")
             else:
                 logger.warning(f"PDF source no encontrado: {pdf_source_path}")
             
@@ -93,8 +90,6 @@ class CertificateStorageService:
             media_root = settings.MEDIA_ROOT
             docx_relative = os.path.relpath(docx_dest, media_root).replace('\\', '/')
             pdf_relative = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
-            
-            logger.info(f"Archivos guardados - DOCX: {docx_relative}, PDF: {pdf_relative}")
             
             return docx_relative, pdf_relative
             
@@ -126,7 +121,6 @@ class CertificateStorageService:
             # Copiar archivo
             if os.path.exists(pdf_source_path):
                 shutil.copy2(pdf_source_path, pdf_dest)
-                logger.info(f"PDF copiado a: {pdf_dest}")
             else:
                 logger.warning(f"PDF source no encontrado: {pdf_source_path}")
                 raise FileNotFoundError(f"PDF source no encontrado: {pdf_source_path}")
@@ -134,8 +128,6 @@ class CertificateStorageService:
             # Convertir a ruta relativa para la base de datos
             media_root = settings.MEDIA_ROOT
             pdf_relative = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
-            
-            logger.info(f"Archivo guardado - PDF: {pdf_relative}")
             
             return pdf_relative
             

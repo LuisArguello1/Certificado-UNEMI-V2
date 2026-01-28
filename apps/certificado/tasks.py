@@ -6,10 +6,12 @@ Este módulo define todas las tareas asíncronas del sistema.
 
 import os
 import logging
+import time
 from celery import shared_task
 from django.core.mail import EmailMessage
 from django.conf import settings
 from django.utils import timezone
+from django.core.cache import cache
 
 
 logger = logging.getLogger(__name__)
@@ -32,8 +34,6 @@ def generate_certificate_task(self, certificado_id: int):
         certificado = Certificado.objects.select_related(
             'evento', 'estudiante', 'evento__direccion'
         ).get(id=certificado_id)
-        
-        logger.info(f"[Certificado {certificado_id}] Iniciando generación para {certificado.estudiante.nombres_completos}")
         
         # Actualizar estado
         certificado.estado = 'generating'
@@ -72,10 +72,10 @@ def generate_certificate_task(self, certificado_id: int):
         certificado.error_mensaje = ''
         certificado.save()
         
-        logger.info(f"[Certificado {certificado_id}] Generación completada exitosamente")
-        
-        # Actualizar progreso del lote
-        update_batch_progress_task.delay(certificado.evento.id)
+        # Actualizar progreso del lote de forma sincrónica
+        # Ejecutamos sincrónicamente para que el cambio se vea reflejado en DB 
+        # inmediatamente después de completar el certificado.
+        _update_batch_progress_sync(certificado.evento.id)
         
         # Limpiar archivos temporales
         try:
@@ -93,12 +93,13 @@ def generate_certificate_task(self, certificado_id: int):
         }
         
     except Exception as exc:
-        logger.error(f"[Certificado {certificado_id}] Error: {str(exc)}", exc_info=True)
+        logger.error(f"[Certificado {certificado_id}] Error: {str(exc)}")
         if certificado:
             certificado.estado = 'failed'
             certificado.error_mensaje = f"Error en generación: {str(exc)}"
             certificado.save()
-            update_batch_progress_task.delay(certificado.evento.id)
+            # Actualizar progreso en caso de error
+            _update_batch_progress_sync(certificado.evento.id)
         
         if 'timeout' in str(exc).lower() or 'temporary' in str(exc).lower():
             raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
@@ -130,8 +131,6 @@ def send_certificate_email_task(self, certificado_id: int):
         certificado = Certificado.objects.select_related(
             'evento', 'estudiante'
         ).get(id=certificado_id)
-        
-        logger.info(f"[Email {certificado_id}] Enviando a {certificado.estudiante.correo_electronico}")
         
         # Verificar que existe el PDF
         if not certificado.archivo_pdf:
@@ -192,10 +191,8 @@ Saludos cordiales,
         certificado.intentos_envio += 1
         certificado.save()
         
-        logger.info(f"[Email {certificado_id}] Enviado exitosamente")
-        
-        # Actualizar progreso del lote
-        update_batch_progress_task.delay(certificado.evento.id)
+        # Actualizar progreso sincrónico cada vez que se envía uno
+        _update_batch_progress_sync(certificado.evento.id)
         
         return {
             'status': 'success',
@@ -204,7 +201,7 @@ Saludos cordiales,
         }
         
     except Exception as exc:
-        logger.error(f"[Email {certificado_id}] Error: {str(exc)}", exc_info=True)
+        logger.error(f"[Email {certificado_id}] Error: {str(exc)}")
         
         # Actualizar intentos
         if certificado:
@@ -220,7 +217,7 @@ Saludos cordiales,
             if certificado:
                 certificado.estado = 'failed'
                 certificado.save()
-                update_batch_progress_task.delay(certificado.evento.id)
+                _update_batch_progress_sync(certificado.evento.id)
             
             return {
                 'status': 'error',
@@ -229,39 +226,43 @@ Saludos cordiales,
             }
 
 
-@shared_task(name='apps.certificado.tasks.update_batch_progress_task')
-def update_batch_progress_task(evento_id: int):
+def _update_batch_progress_sync(evento_id: int):
     """
-    Actualiza el progreso del procesamiento en lote.
-    
-    Args:
-        evento_id: ID del evento
-    
-    Esta tarea se llama después de cada certificado procesado
-    para actualizar los contadores del ProcesamientoLote.
+    Actualiza el progreso del procesamiento en lote de forma SINCRÓNICA.
+    Se llama desde dentro de otras tareas para evitar el delay de la cola de Celery.
     """
     from .models import ProcesamientoLote
     
-    try:
-        lote = ProcesamientoLote.objects.get(evento_id=evento_id)
-        lote.actualizar_contadores()
-        
-        logger.info(
-            f"[Lote {lote.id}] Progreso actualizado: "
-            f"{lote.procesados}/{lote.total_estudiantes} "
-            f"({lote.porcentaje_progreso}%)"
-        )
-        
-        return {
-            'status': 'success',
-            'lote_id': lote.id,
-            'progreso': lote.porcentaje_progreso
-        }
-        
-    except Exception as exc:
-        logger.error(f"[Lote Evento {evento_id}] Error actualizando progreso: {str(exc)}")
-        return {
-            'status': 'error',
-            'evento_id': evento_id,
-            'error': str(exc)
-        }
+    # Key de throttling para no saturar la DB si hay muchos workers terminando a la vez
+    cache_key = f"batch_progress_throttle_{evento_id}"
+    
+    # Verificar si podemos actualizar (throttling reducido a 0.5s para fluidez)
+    last_update_time = cache.get(cache_key)
+    current_time = time.time()
+    
+    # Si han pasado más de 0.5 segundos desde la última actualización, procesamos
+    if last_update_time is None or (current_time - last_update_time) >= 0.5:
+        try:
+            lote = ProcesamientoLote.objects.get(evento_id=evento_id)
+            lote.actualizar_contadores()
+            
+            # Actualizar timestamp de última actualización
+            cache.set(cache_key, current_time, timeout=300)
+            
+            logger.info(f"[Lote {evento_id}] Progreso actualizado sincrónicamente: {lote.porcentaje_progreso}%")
+            return True
+            
+        except Exception as exc:
+            logger.error(f"[Lote Evento {evento_id}] Error actualizando progreso: {str(exc)}")
+            return False
+    return False
+
+
+@shared_task(name='apps.certificado.tasks.update_batch_progress_task')
+def update_batch_progress_task(evento_id: int):
+    """
+    Tarea Celery (wrapper) para actualizar el progreso.
+    """
+    success = _update_batch_progress_sync(evento_id)
+    return {'status': 'success' if success else 'throttled', 'evento_id': evento_id}
+
