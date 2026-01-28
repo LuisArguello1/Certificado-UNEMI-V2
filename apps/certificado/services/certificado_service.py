@@ -113,13 +113,11 @@ class CertificadoService:
                     certificado.estado = 'pending'
                     certificado.save()
                 
-                # Encolar tarea con logging detallado
-                logger.info(f"[DEBUG] Encolando tarea para certificado ID: {certificado.id}, Estudiante: {estudiante.nombres_completos}")
+                # Encolar tarea
                 try:
-                    task_result = generate_certificate_task.delay(certificado.id)
-                    logger.info(f"[DEBUG] Tarea encolada exitosamente. Task ID: {task_result.id if task_result else 'N/A'}")
+                    generate_certificate_task.delay(certificado.id)
                 except Exception as e:
-                    logger.error(f"[ERROR] Error al encolar tarea: {str(e)}", exc_info=True)
+                    logger.error(f"Error al encolar tarea para certificado {certificado.id}: {str(e)}")
                     raise
 
             
