@@ -140,31 +140,76 @@ def send_certificate_email_task(self, certificado_id: int):
         certificado.estado = 'sending_email'
         certificado.save(update_fields=['estado', 'updated_at'])
         
-        # Construir email
+        # Construir email con template HTML
+        from django.template.loader import render_to_string
+        from datetime import datetime
+        import base64
+        
         subject = f"Certificado - {certificado.evento.nombre_evento}"
-        body = f"""
+        
+        # Contexto para el template
+        context = {
+            'nombre_estudiante': certificado.estudiante.nombres_completos,
+            'nombre_evento': certificado.evento.nombre_evento,
+            'anio_actual': datetime.now().year,
+        }
+        
+        # Renderizar template HTML
+        html_content = render_to_string('certificado/email/certificado_email.html', context)
+        
+        # Versión texto plano como fallback
+        text_content = f"""
 Estimado/a {certificado.estudiante.nombres_completos},
 
-Adjunto encontrará su certificado del evento:
-{certificado.evento.nombre_evento}
+Nos complace comunicarle que, en reconocimiento a su valiosa participación en la Jornada: {certificado.evento.nombre_evento}, le hacemos llegar adjunto a este mensaje su certificado. Este documento acredita su activa intervención y compromiso durante la actividad desarrollada.
 
-Fecha: {certificado.evento.fecha_inicio.strftime('%d/%m/%Y')} - {certificado.evento.fecha_fin.strftime('%d/%m/%Y')}
-Duración: {certificado.evento.duracion_horas} horas
-Modalidad: {certificado.evento.modalidad.nombre}
+Le invitamos a seguir formando parte de nuestras próximas actividades. Para más información, no dude en contactarnos.
 
 Saludos cordiales,
-{certificado.evento.direccion.nombre}
+Universidad Estatal de Milagro - UNEMI
+
+Todos los derechos reservados © UNEMI {datetime.now().year}
         """.strip()
         
-        # Crear email
-        email = EmailMessage(
+        # Crear email con alternativas (texto y HTML)
+        from django.core.mail import EmailMultiAlternatives
+        
+        email = EmailMultiAlternatives(
             subject=subject,
-            body=body,
+            body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[certificado.estudiante.correo_electronico]
         )
         
-        # Adjuntar PDF
+        # Adjuntar versión HTML
+        email.attach_alternative(html_content, "text/html")
+        
+        # LOGO: Usar CID (Content-ID) para máxima compatibilidad
+        try:
+            base_dir = str(settings.BASE_DIR)
+            logo_path = os.path.join(base_dir, 'static', 'img', 'Unemi_correo.png')
+            
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as logo_file:
+                    logo_data = logo_file.read()
+                    
+                    # Crear imagen MIME
+                    from email.mime.image import MIMEImage
+                    logo_image = MIMEImage(logo_data)
+                    
+                    # Definir Content-ID EXACTAMENTE como se usa en el HTML
+                    logo_image.add_header('Content-ID', '<unemi_logo>')
+                    logo_image.add_header('Content-Disposition', 'inline', filename='Unemi_correo.png')
+                    
+                    # Adjuntar al root del mensaje (o related)
+                    email.attach(logo_image)
+        except Exception:
+            # Si falla el logo, el correo se envía igual sin él (fallback texto en HTML)
+            pass
+        
+        # Adjuntar PDF del certificado
+        
+        # Adjuntar PDF del certificado
         pdf_path = certificado.archivo_pdf.path if hasattr(certificado.archivo_pdf, 'path') else certificado.archivo_pdf
         if os.path.exists(pdf_path):
             with open(pdf_path, 'rb') as pdf_file:
@@ -180,8 +225,7 @@ Saludos cordiales,
         email.send(fail_silently=False)
         
         # Incrementar contador diario de emails
-        # Incrementar contador diario de emails
-        from apps.correo.models import EmailDailyLimit
+        from apps.certificado.models import EmailDailyLimit
         EmailDailyLimit.increment_count()
         
         # Actualizar certificado

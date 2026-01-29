@@ -157,7 +157,7 @@ class CertificadoService:
         Paso 3: Encola el envío masivo de certificados ya generados.
         """
         from ..tasks import send_certificate_email_task
-        from apps.correo.models import EmailDailyLimit
+        from apps.certificado.models import EmailDailyLimit, Certificado
         
         try:
             evento = Evento.objects.get(id=evento_id)
@@ -175,9 +175,15 @@ class CertificadoService:
             puede_enviar, restantes, mensaje = EmailDailyLimit.puede_enviar_lote(num_a_enviar)
             if not puede_enviar:
                 raise ValueError(mensaje)
+            
+            # IMPORTANTE: Cambiar estado masivamente a 'sending_email' ANTES de encolar
+            # Esto asegura que la barra de progreso baje a 0% inmediatamente,
+            # ya que 'completed' cuenta como finalizado en la lógica de progreso.
+            cert_ids = list(certificados.values_list('id', flat=True))
+            certificados.update(estado='sending_email', updated_at=timezone.now())
                 
-            for cert in certificados:
-                send_certificate_email_task.delay(cert.id)
+            for cert_id in cert_ids:
+                send_certificate_email_task.delay(cert_id)
             
             # Asegurarse que el lote refleje que está procesando (emails)
             lote = ProcesamientoLote.objects.filter(evento=evento).first()

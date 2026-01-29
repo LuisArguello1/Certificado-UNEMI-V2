@@ -202,7 +202,7 @@ function generateIndividual(estId) {
                 if (window.loadingOverlay) {
                     window.loadingOverlay.updateMessage('Certificado en proceso. Espere por favor...');
                 }
-                startPolling();
+                startIndividualPolling(data.certificado_id);
             } else {
                 showToast(data.error.toUpperCase());
                 if (window.loadingOverlay) {
@@ -217,6 +217,46 @@ function generateIndividual(estId) {
                 window.loadingOverlay.hide();
             }
         });
+}
+
+/**
+ * Polling específico para un certificado individual
+ */
+function startIndividualPolling(certId) {
+    if (pollInterval) clearInterval(pollInterval);
+
+    const checkStatus = () => {
+        const formData = new FormData();
+        formData.append('action', 'get_certificate_status');
+        formData.append('certificado_id', certId);
+        formData.append('csrfmiddlewaretoken', csrftoken);
+
+        fetch('', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.is_complete) {
+                        clearInterval(pollInterval);
+
+                        if (data.status === 'failed') {
+                            showToast("ERROR: " + (data.error_mensaje || 'Falló la generación'));
+                            if (window.loadingOverlay) window.loadingOverlay.hide();
+                        } else {
+                            showToast("CERTIFICADO GENERADO CON ÉXITO");
+                            if (window.loadingOverlay) {
+                                window.loadingOverlay.updateMessage('¡Completado! Recargando...');
+                            }
+                            setTimeout(() => location.reload(), 1000);
+                        }
+                    }
+                    // Si sigue en pending, seguimos esperando
+                }
+            })
+            .catch(error => console.error('Error polling individual:', error));
+    };
+
+    checkStatus();
+    pollInterval = setInterval(checkStatus, 2000);
 }
 
 /**
@@ -372,19 +412,35 @@ function confirmSend() {
     formData.append('action', 'start_sending');
     formData.append('csrfmiddlewaretoken', csrftoken);
 
+    // Mostrar loading overlay
+    if (window.loadingOverlay) {
+        window.loadingOverlay.show('Iniciando envío masivo de correos...');
+    }
+
     fetch('', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
                 showToast(data.message.toUpperCase());
+
+                if (window.loadingOverlay) {
+                    window.loadingOverlay.updateMessage('Envío iniciado. Procesando correos...');
+                }
+
                 startPolling();
             } else {
                 showToast(data.error.toUpperCase());
+                if (window.loadingOverlay) {
+                    window.loadingOverlay.hide();
+                }
             }
         })
         .catch(error => {
             console.error('Error:', error);
             showToast("ERROR AL INICIAR ENVÍO");
+            if (window.loadingOverlay) {
+                window.loadingOverlay.hide();
+            }
         });
 }
 

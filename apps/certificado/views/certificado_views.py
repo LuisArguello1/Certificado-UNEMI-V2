@@ -14,11 +14,10 @@ from django.shortcuts import redirect, get_object_or_404 # Added get_object_or_4
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse # Added HttpResponse
 from django.views import View
-from ..models import ProcesamientoLote, Certificado, VariantePlantilla, Evento, Estudiante # Added Estudiante
+from ..models import ProcesamientoLote, Certificado, VariantePlantilla, Evento, Estudiante, EmailDailyLimit # Added Estudiante
 from ..forms import EventoForm, ExcelUploadForm
 from ..services import CertificadoService
 from ..utils import parse_excel_estudiantes
-from apps.correo.models import EmailDailyLimit
 from ..tasks import generate_certificate_task # Added generate_certificate_task
 import logging
 
@@ -390,6 +389,20 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
                 })
             except Exception as e:
                 return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+        elif action == 'get_certificate_status':
+            cert_id = request.POST.get('certificado_id')
+            try:
+                cert = Certificado.objects.get(id=cert_id)
+                is_complete = cert.estado in ['completed', 'failed', 'sent']
+                return JsonResponse({
+                    'success': True,
+                    'status': cert.estado,
+                    'is_complete': is_complete,
+                    'error_mensaje': cert.error_mensaje if cert.estado == 'failed' else ''
+                })
+            except Certificado.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Certificado no encontrado'})
 
         elif action == 'get_progress':
             lote = ProcesamientoLote.objects.filter(evento=evento).first()

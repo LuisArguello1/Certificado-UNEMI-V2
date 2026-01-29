@@ -62,20 +62,12 @@ THIRD_PARTY_APPS = [
     'widget_tweaks',
     'tailwind',
     'theme',
-    'crispy_forms',
-    'crispy_bootstrap5',
 ]
-
-# Configuración de Crispy Forms
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
-CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # Aplicaciones locales
 LOCAL_APPS = [
     'apps.accounts',
     'apps.core',
-    'apps.correo',
-    'apps.curso',
     'apps.certificado',
 ]
 
@@ -283,29 +275,9 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        # 'apps.accounts': {
-        #     'handlers': ['console'],
-        #     'level': 'DEBUG',
-        #     'propagate': False,
-        # },
-        'apps.settings': {
+        'apps.accounts': {
             'handlers': ['console'],
             'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.usuarios': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.archivos': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.correo': {
-            'handlers': ['console', 'file_error'],
-            'level': 'INFO',
             'propagate': False,
         },
         'apps.certificado': {

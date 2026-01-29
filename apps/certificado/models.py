@@ -21,7 +21,8 @@ from django.utils import timezone
 from datetime import datetime
 import uuid
 import os
-
+from django.utils import timezone
+from datetime import date
 
 # =============================================================================
 # PATH GENERATORS
@@ -769,3 +770,118 @@ class ProcesamientoLote(models.Model):
                 self.fecha_fin = timezone.now()
         
         self.save()
+
+
+class EmailDailyLimit(models.Model):
+    """
+    Modelo para tracking del límite diario de envío de correos.
+    Se usa para evitar exceder el límite impuesto por el servidor SMTP.
+    """
+    date = models.DateField(
+        unique=True, 
+        default=date.today,
+        verbose_name='Fecha'
+    )
+    count = models.IntegerField(
+        default=0, 
+        verbose_name='Correos enviados'
+    )
+    
+    class Meta:
+        verbose_name = 'Límite diario de correos'
+        verbose_name_plural = 'Límites diarios de correos'
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.date}: {self.count} correos enviados"
+    
+    @classmethod
+    def can_send_email(cls):
+        """
+        Verifica si aún se puede enviar un correo sin exceder el límite diario.
+        
+        Returns:
+            bool: True si se puede enviar, False si se alcanzó el límite
+        """
+        from django.conf import settings
+        
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        
+        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        
+        return limit_record.count < daily_limit
+    
+    @classmethod
+    def increment_count(cls):
+        """
+        Incrementa el contador de correos enviados hoy.
+        """
+        today = date.today()
+        from django.db.models import F
+        
+        today = date.today()
+        # Usar get_or_create para asegurar existencia
+        limit_record, created = cls.objects.get_or_create(date=today)
+        
+        # Actualización atómica para evitar race conditions
+        limit_record.count = F('count') + 1
+        limit_record.save(update_fields=['count'])
+        
+        # Recargar para obtener valor actualizado si se necesita
+        limit_record.refresh_from_db()
+        return limit_record.count
+    
+    @classmethod
+    def get_remaining_today(cls):
+        """
+        Obtiene la cantidad de correos que aún se pueden enviar hoy.
+        
+        Returns:
+            int: Cantidad de correos restantes
+        """
+        from django.conf import settings
+        
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        
+        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        remaining = daily_limit - limit_record.count
+        
+        return max(0, remaining)
+
+    @classmethod
+    def puede_enviar_lote(cls, cantidad):
+        """
+        Verifica si se puede enviar un lote de emails.
+        
+        Args:
+            cantidad: Número de emails a enviar
+        
+        Returns:
+            tuple: (puede_enviar: bool, emails_restantes: int, mensaje: str)
+        """
+        restantes = cls.get_remaining_today()
+        
+        daily_limit = cls.get_limit()
+        
+        if cantidad > restantes:
+            mensaje = (
+                f"No se puede enviar el lote. Se requieren {cantidad} emails "
+                f"pero solo quedan {restantes} disponibles hoy (límite: {daily_limit}/día)."
+            )
+            return False, restantes, mensaje
+        
+        return True, restantes, f"Se pueden enviar {cantidad} emails. Restantes: {restantes - cantidad}"
+
+    @classmethod
+    def get_limit(cls):
+        from django.conf import settings
+        return getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+    
+    @classmethod
+    def get_usage(cls):
+        today = date.today()
+        limit_record, created = cls.objects.get_or_create(date=today)
+        return limit_record.count
+
