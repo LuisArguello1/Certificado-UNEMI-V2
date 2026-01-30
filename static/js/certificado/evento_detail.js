@@ -444,6 +444,45 @@ function confirmSend() {
         });
 }
 
+/**
+ * Alterna el estado de inclusión de QR en los certificados
+ */
+function toggleQrSeguridad() {
+    const toggle = document.getElementById('toggleQrInput');
+    const statusText = document.getElementById('qrStatusText');
+    if (!toggle || !statusText) return;
+
+    const isChecked = toggle.checked;
+    
+    // Optimistic UI update
+    statusText.textContent = isChecked ? 'ACTIVO' : 'INACTIVO';
+
+    const formData = new FormData();
+    formData.append('action', 'toggle_qr');
+    formData.append('incluir_qr', isChecked ? 'true' : 'false');
+    formData.append('csrfmiddlewaretoken', csrftoken);
+
+    fetch('', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast("SEGURIDAD QR ACTUALIZADA");
+            } else {
+                showToast("ERROR AL ACTUALIZAR");
+                // Revert
+                toggle.checked = !isChecked;
+                statusText.textContent = !isChecked ? 'ACTIVO' : 'INACTIVO';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast("ERROR DE CONEXIÓN");
+            // Revert
+            toggle.checked = !isChecked;
+            statusText.textContent = !isChecked ? 'ACTIVO' : 'INACTIVO';
+        });
+}
+
 // Inicialización al cargar la página
 document.addEventListener('DOMContentLoaded', function () {
     // Si hay un lote en proceso, iniciar polling automáticamente

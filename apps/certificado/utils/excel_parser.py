@@ -199,18 +199,12 @@ class ExcelParser:
             nombres = str(nombres_cell.value).strip() if nombres_cell.value else ''
             correo = str(correo_cell.value).strip() if correo_cell.value else ''
             
-            # Saltar filas vacías
+            # Saltar filas completamente vacías
             if not nombres and not correo:
                 continue
             
-            # Validar que ambos campos están presentes
-            if not nombres:
-                logger.warning(f"Fila {row_idx}: Nombre vacío, correo: {correo}")
-                continue
-            
-            if not correo:
-                logger.warning(f"Fila {row_idx}: Correo vacío, nombre: {nombres}")
-                continue
+            # NOTA: No validamos aquí si falta uno, lo dejamos pasar para que _validate_data 
+            # reporte todos los errores juntos.
             
             estudiantes.append({
                 'nombres_completos': nombres,
@@ -229,18 +223,13 @@ class ExcelParser:
     def _validate_data(self, estudiantes: List[Dict[str, str]]):
         """
         Valida los datos extraídos.
-        
-        Args:
-            estudiantes: Lista de estudiantes a validar
-        
-        Raises:
-            ExcelParseError: Si hay errores de validación
         """
         errores = []
         correos_vistos = set()
+        nombres_vistos = set()
         
-        # Regex para validar email (solo permite letras, números, ., _, -, @ y dominios válidos)
-        # No permite caracteres especiales raros
+        # Regex para validar email estricto (no permite tildes ni caracteres especiales raros)
+        # Solo letras, números, ., _, - y @.
         email_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*@[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
         
         for estudiante in estudiantes:
@@ -248,54 +237,67 @@ class ExcelParser:
             nombres = estudiante['nombres_completos']
             correo = estudiante['correo_electronico']
             
-            # Validar longitud de nombres
+            # --- VALIDACIÓN DE NOMBRES ---
+            
+            # Validar longitud
             if len(nombres) > 300:
-                errores.append(f"Fila {row_num}: Nombre demasiado largo ({len(nombres)} caracteres, máximo 300)")
+                errores.append(f"Fila {row_num}: Nombre demasiado largo ({len(nombres)} caracteres).")
             
-            # Validar que el nombre no esté vacío o sea solo espacios
+            # Validar que no esté vacío
             if not nombres or nombres.isspace():
-                errores.append(f"Fila {row_num}: Nombre vacío o inválido")
+                errores.append(f"Fila {row_num}: El campo 'Nombres' está vacío.")
+            else:
+                # Validar Nombres Duplicados
+                nombres_norm = self.normalize_text(nombres)
+                if nombres_norm in nombres_vistos:
+                   errores.append(f"Fila {row_num}: Nombre duplicado: '{nombres}' ya existe en el archivo.")
+                else:
+                    nombres_vistos.add(nombres_norm)
             
-            # Validar formato de correo
+            # --- VALIDACIÓN DE CORREOS ---
+            
+            # Validar que no esté vacío
+            if not correo or correo.isspace():
+                errores.append(f"Fila {row_num}: El campo 'Correo Electrónico' está vacío.")
+                continue # No seguir validando este correo
+                
             correo_stripped = correo.strip()
+            
+            # Validar formato con Regex estricto
             if not email_regex.match(correo_stripped):
                 errores.append(
-                    f"Fila {row_num}: Formato de correo inválido: {correo}. "
-                    f"El correo solo puede contener letras, números, puntos, guiones y guión bajo."
+                    f"Fila {row_num}: Formato de correo inválido: '{correo}'. "
+                    f"No se permiten tildes, espacios ni caracteres especiales. Solo letras, números, '.', '_', '-'."
                 )
                 continue
             
-            # Validar que no tenga caracteres especiales raros (doble check)
-            caracteres_invalidos = set(correo_stripped) - set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@._-')
-            if caracteres_invalidos:
-                errores.append(
-                    f"Fila {row_num}: Correo contiene caracteres no permitidos: {correo}. "
-                    f"Caracteres inválidos: {', '.join(caracteres_invalidos)}"
-                )
-                continue
-            
-            # Validar que no empiece o termine con punto o guión
-            local_part = correo_stripped.split('@')[0]
-            if local_part.startswith('.') or local_part.startswith('-') or local_part.endswith('.') or local_part.endswith('-'):
-                errores.append(f"Fila {row_num}: El correo no puede empezar o terminar con punto o guión: {correo}")
-                continue
-            
-            # Validar que no tenga puntos consecutivos
-            if '..' in correo_stripped:
-                errores.append(f"Fila {row_num}: El correo no puede tener puntos consecutivos: {correo}")
-                continue
-            
-            # Validar correos duplicados
+            # Validar duplicados de correo
             correo_lower = correo_stripped.lower()
             if correo_lower in correos_vistos:
-                errores.append(f"Fila {row_num}: Correo duplicado: {correo}")
+                errores.append(f"Fila {row_num}: Correo duplicado: '{correo}' ya existe en el archivo.")
             else:
                 correos_vistos.add(correo_lower)
-        
+            
+            # Validaciones extra de estructura
+            local_part = correo_stripped.split('@')[0]
+            if local_part.startswith('.') or local_part.startswith('-') or local_part.endswith('.') or local_part.endswith('-'):
+                errores.append(f"Fila {row_num}: El correo no puede empezar o terminar con punto o guión.")
+            
+            if '..' in correo_stripped:
+                errores.append(f"Fila {row_num}: El correo no puede tener puntos consecutivos.")
+
         # Si hay errores, lanzar excepción con todos los detalles
         if errores:
-            mensaje_error = "Errores de validación en el archivo Excel:\n" + "\n".join(errores)
-            logger.error(mensaje_error)
+            # Limitar número de errores mostrados para no saturar la pantalla
+            if len(errores) > 20:
+                 errores_mostrados = errores[:20]
+                 errores_mostrados.append(f"... y {len(errores) - 20} errores más.")
+                 mensaje_full = "\n".join(errores_mostrados)
+            else:
+                 mensaje_full = "\n".join(errores)
+                
+            mensaje_error = f"Se encontraron errores en el archivo Excel:\n\n{mensaje_full}"
+            logger.warning(mensaje_error) # Changed from error to warning
             raise ExcelParseError(mensaje_error)
 
 

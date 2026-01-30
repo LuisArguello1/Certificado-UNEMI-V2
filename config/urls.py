@@ -18,12 +18,17 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.certificado.views.public_views import ValidacionCertificadoView
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.core.urls')),  # Core app (dashboard) at ROOT
     path('certificados/', include('apps.certificado.urls')),  # Certificados app
     path('auth/', include('apps.accounts.urls')),  # Accounts app
+    
+    # Ruta de validación QR en la raíz para URLs más cortas
+    path('validar/<uuid:uuid>/', ValidacionCertificadoView.as_view(), name='validar_certificado'),
 ]
 
 if settings.DEBUG:
