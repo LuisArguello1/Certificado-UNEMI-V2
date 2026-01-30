@@ -471,8 +471,18 @@ class Evento(models.Model):
         help_text='Descripción específica del tipo de evento'
     )
     fecha_emision = models.DateField(
+        default=timezone.now,
         verbose_name='Fecha de Emisión'
     )
+    
+    
+    # Configuración de Seguridad
+    incluir_qr = models.BooleanField(
+        default=False,
+        verbose_name='Incluir QR de Seguridad',
+        help_text='Si se activa, se estampará un código QR único en cada certificado generado.'
+    )
+
     objetivo_programa = models.TextField(
         verbose_name='Objetivo del Programa'
     )
@@ -569,6 +579,8 @@ class Certificado(models.Model):
         ('sending_email', 'Enviando Email'),
         ('sent', 'Enviado'),
     ]
+
+
     
     # Relaciones
     evento = models.ForeignKey(
@@ -605,6 +617,18 @@ class Certificado(models.Model):
         default='pending',
         verbose_name='Estado'
     )
+
+    
+    # Campo único para validación pública (QR)
+    uuid_validacion = models.UUIDField(
+        default=uuid.uuid4, 
+        editable=False, 
+        unique=True,
+        null=True, # Permitir nulos temporalmente para migración
+        blank=True,
+        verbose_name='UUID de Validación'
+    )
+    
     enviado_email = models.BooleanField(
         default=False,
         verbose_name='Email Enviado'

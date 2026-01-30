@@ -61,9 +61,22 @@ class CertificadoCreateView(LoginRequiredMixin, TemplateView):
                 return redirect('certificado:evento_detail', pk=evento.id)
                 
             except Exception as e:
-                logger.error(f"Error al crear evento: {str(e)}", exc_info=True)
                 messages.error(request, f'Error al crear el evento: {str(e)}')
         
+        else:
+            # Mostrar errores de formularios vía messages
+            if excel_form.errors:
+                for field, errors in excel_form.errors.items():
+                    error_msg = "\n".join(errors)
+                    # Limpiar el mensaje si viene del parser que ya trae saltos de línea
+                    if field == 'archivo_excel':
+                         messages.error(request, f"{error_msg}")
+                    else:
+                         messages.error(request, f"Error en {field}: {error_msg}")
+            
+            if evento_form.errors:
+                 messages.error(request, "Por favor corrija los errores en el formulario del evento.")
+
         return self.render_to_response(self.get_context_data(
             evento_form=evento_form,
             excel_form=excel_form
@@ -403,6 +416,16 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
                 })
             except Certificado.DoesNotExist:
                 return JsonResponse({'success': False, 'error': 'Certificado no encontrado'})
+
+        elif action == 'toggle_qr':
+            try:
+                incluir = request.POST.get('incluir_qr') == 'true'
+                evento.incluir_qr = incluir
+                evento.save()
+                return JsonResponse({'success': True})
+            except Exception as e:
+                logger.error(f"Error toggling QR: {str(e)}")
+                return JsonResponse({'success': False, 'error': str(e)})
 
         elif action == 'get_progress':
             lote = ProcesamientoLote.objects.filter(evento=evento).first()

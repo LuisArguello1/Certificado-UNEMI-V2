@@ -1,0 +1,190 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validación de Certificado | UNEMI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        
+        .document-container {
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.05),
+                0 10px 40px rgba(0, 0, 0, 0.08),
+                0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .institutional-border {
+            border-top: 3px solid #1a4d2e;
+        }
+        
+        .validation-seal {
+            background: linear-gradient(135deg, #1a4d2e 0%, #2d5f3f 100%);
+        }
+        
+        .data-field {
+            border-left: 2px solid #e5e7eb;
+            transition: border-color 0.2s ease;
+        }
+        
+        .data-field:hover {
+            border-left-color: #1a4d2e;
+        }
+        
+        .uuid-badge {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .institutional-logo {
+            filter: grayscale(0%);
+            opacity: 0.95;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="min-h-screen flex items-center justify-center p-4 md:p-8">
+        <div class="w-full max-w-2xl">
+            
+            <!-- Main Document Card -->
+            <div class="bg-white document-container institutional-border">
+                
+                <!-- Header Institucional -->
+                <div class="bg-white border-b border-gray-200 px-8 py-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <img src="{% static 'img/Unemi_correo.png' %}" alt="UNEMI" class="h-12 institutional-logo">
+                            <div class="border-l-2 border-gray-300 pl-4">
+                                <h1 class="text-sm font-bold text-gray-900 uppercase tracking-wide leading-tight">
+                                    Universidad Estatal de Milagro
+                                </h1>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mt-0.5 font-medium">
+                                    Sistema de Validación Digital
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status de Validación -->
+                <div class="px-8 py-8 bg-gradient-to-br from-gray-50 to-white">
+                    <div class="flex items-start space-x-5">
+                        <div class="validation-seal rounded-sm p-4 flex-shrink-0">
+                            <i class="fas fa-shield-check text-3xl text-white"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <div class="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span class="text-xs font-bold text-green-700 uppercase tracking-wider">
+                                    Certificado Verificado
+                                </span>
+                            </div>
+                            <h2 class="text-2xl font-black text-gray-900 uppercase tracking-tight leading-tight mb-1">
+                                Documento Auténtico
+                            </h2>
+                            <p class="text-sm text-gray-600 font-medium">
+                                Este certificado ha sido validado correctamente en el sistema institucional
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información del Certificado -->
+                <div class="px-8 py-8 space-y-6">
+                    
+                    <!-- Beneficiario -->
+                    <div class="data-field pl-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                            Otorgado a
+                        </label>
+                        <p class="text-lg font-black text-gray-900 uppercase tracking-tight">
+                            {{ certificado.estudiante.nombres_completos }}
+                        </p>
+                    </div>
+
+                    <!-- Programa/Evento -->
+                    <div class="data-field pl-4">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                            Programa / Evento
+                        </label>
+                        <p class="text-base font-bold text-gray-800 leading-snug">
+                            {{ certificado.evento.nombre_evento }}
+                        </p>
+                    </div>
+
+                    <!-- Detalles Técnicos -->
+                    <div class="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                        <div class="data-field pl-4">
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                Fecha de Emisión
+                            </label>
+                            <p class="text-sm font-bold text-gray-900">
+                                {{ certificado.evento.fecha_emision|date:"d/m/Y" }}
+                            </p>
+                        </div>
+                        <div class="data-field pl-4">
+                            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                Duración
+                            </label>
+                            <p class="text-sm font-bold text-gray-900">
+                                {{ certificado.evento.duracion_horas }} horas
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- UUID de Validación -->
+                    <div class="pt-6 border-t border-gray-100">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">
+                            Código de Verificación
+                        </label>
+                        <div class="uuid-badge rounded-sm px-4 py-3 text-center">
+                            <p class="text-xs text-gray-600 break-all font-medium">
+                                {{ certificado.uuid_validacion }}
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Institucional -->
+                <div class="bg-gray-900 px-8 py-5 border-t border-gray-800">
+                    <div class="flex items-center justify-between text-xs">
+                        <div>
+                            <p class="text-gray-400 font-medium uppercase tracking-wider">
+                                Universidad Estatal de Milagro
+                            </p>
+                            <p class="text-gray-500 text-xs mt-0.5">
+                                Sistema Oficial de Certificación Digital
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-gray-500 font-mono text-xs">
+                                {{ certificado.evento.fecha_emision|date:"Y" }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Nota Legal -->
+            <div class="mt-4 px-4">
+                <p class="text-xs text-gray-500 text-center leading-relaxed">
+                    Este documento digital es de carácter oficial y posee validez institucional.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

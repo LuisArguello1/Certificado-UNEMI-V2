@@ -63,7 +63,7 @@
     </div>
 
     <!-- Info Grid (Estilo Dashboard Usuarios) -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div class="bg-white border border-gray-200 p-3 shadow-sm text-center">
             <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Modalidad</span>
             <p class="text-[11px] font-black text-gray-800 uppercase">{{ evento.modalidad.nombre }}</p>
@@ -89,6 +89,19 @@
                 <span class="text-gray-300">Pendiente</span>
                 {% endif %}
             </p>
+        </div>
+        <!-- QR Security Toggle -->
+        <div class="bg-white border border-gray-200 p-3 shadow-sm text-center">
+            <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Seguridad QR</span>
+            <div class="flex justify-center mt-1">
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggleQrInput" class="sr-only peer" {% if evento.incluir_qr %}checked{% endif %} onchange="toggleQrSeguridad()">
+                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                    <span class="ml-2 text-[10px] font-black uppercase text-gray-800" id="qrStatusText">
+                        {% if evento.incluir_qr %}ACTIVO{% else %}INACTIVO{% endif %}
+                    </span>
+                </label>
+            </div>
         </div>
     </div>
 

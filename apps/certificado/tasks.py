@@ -59,6 +59,16 @@ def generate_certificate_task(self, certificado_id: int):
         # Convertir directamente a PDF
         temp_pdf = PDFConversionService.convert_docx_to_pdf(temp_docx)
         
+        # --- INYECCIÓN DE QR ---
+        if certificado.evento.incluir_qr:
+            try:
+                from .services.qr_service import QRService
+                QRService.stamp_qr_on_pdf(temp_pdf, certificado.uuid_validacion)
+            except Exception as e:
+                logger.error(f"Error inyectando QR en certificado {certificado.id}: {str(e)}")
+                # No fallamos la tarea completa, pero logueamos el error.
+                # Opcional: certificado.error_mensaje += " Error QR."
+        
         # Guardar SOLO el PDF en ubicación final
         pdf_path = CertificateStorageService.save_pdf_only(
             evento_id=certificado.evento.id,
@@ -107,7 +117,15 @@ def generate_certificate_task(self, certificado_id: int):
         return {'status': 'error', 'certificado_id': certificado_id, 'error': str(exc)}
 
 
-@shared_task(bind=True, max_retries=5, rate_limit='30/m', name='apps.certificado.tasks.send_certificate_email_task')
+# Calcular RATE LIMIT dinámico basado en configuración
+try:
+    rate_seconds = getattr(settings, 'EMAIL_RATE_LIMIT_SECONDS', 2)
+    emails_per_minute = 60 // max(1, rate_seconds)
+    RATE_LIMIT_VALUE = f"{emails_per_minute}/m"
+except Exception:
+    RATE_LIMIT_VALUE = '30/m'
+
+@shared_task(bind=True, max_retries=5, rate_limit=RATE_LIMIT_VALUE, name='apps.certificado.tasks.send_certificate_email_task')
 def send_certificate_email_task(self, certificado_id: int):
     """
     Tarea de envío de email con certificado PDF adjunto.

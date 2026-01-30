@@ -44,6 +44,7 @@ from .views.catalogo_views import (
     TipoEventoDeleteView, 
     TipoEventoToggleActiveView
 )
+from .views.public_views import ValidacionCertificadoView
 
 app_name = 'certificado'
 
@@ -91,7 +92,6 @@ urlpatterns = [
     path('tipos-evento/<int:pk>/eliminar/', TipoEventoDeleteView.as_view(), name='tipo_evento_delete'),
     path('tipos-evento/<int:pk>/toggle-active/', TipoEventoToggleActiveView.as_view(), name='tipo_evento_toggle_active'),
     
-    # API endpoints
     path('api/variantes/<int:direccion_id>/', get_variantes_api, name='get_variantes'),
     path('api/plantillas/<int:direccion_id>/', get_plantillas_api, name='get_plantillas'),
     path('api/preview-certificado/', CertificadoPreviewView.as_view(), name='preview_certificado'),
