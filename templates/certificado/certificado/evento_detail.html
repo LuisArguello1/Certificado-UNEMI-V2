@@ -37,6 +37,14 @@
                 {% if stats.exitosos == 0 %}disabled{% endif %}>
                 <i class="fas fa-paper-plane mr-1.5"></i> ENVIAR EMAIL
             </button>
+
+            <!-- Botón Eliminar Certificados: Solo si hay generados (exitosos o fallidos) -->
+            {% if stats.exitosos > 0 or stats.fallidos > 0 %}
+            <button type="button" onclick="confirmarEliminacionCertificados()" 
+                class="inline-flex items-center px-3 py-1.5 border border-transparent text-[10px] font-bold rounded-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none shadow-sm transition-all uppercase tracking-widest">
+                <i class="fas fa-trash-alt mr-1.5"></i> ELIMINAR TODO
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -208,6 +216,56 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Paginación -->
+        {% if estudiantes.has_other_pages %}
+        <div class="bg-gray-50 border-t border-gray-200 px-4 py-3 flex items-center justify-between sm:px-6">
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                        Mostrando <span class="font-black text-black">{{ estudiantes.start_index }}</span> a <span class="font-black text-black">{{ estudiantes.end_index }}</span> de <span class="font-black text-black">{{ estudiantes.paginator.count }}</span> resultados
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        {% if estudiantes.has_previous %}
+                            <a href="?page={{ estudiantes.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-l-sm border border-gray-300 bg-white text-xs font-bold text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Anterior</span>
+                                <i class="fas fa-as fa-chevron-left"></i>
+                            </a>
+                        {% else %}
+                            <span class="relative inline-flex items-center px-2 py-2 rounded-l-sm border border-gray-300 bg-gray-50 text-xs font-bold text-gray-300 cursor-not-allowed">
+                                <i class="fas fa-as fa-chevron-left"></i>
+                            </span>
+                        {% endif %}
+
+                        {% for i in estudiantes.paginator.page_range %}
+                            {% if estudiantes.number == i %}
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-black text-white text-[10px] font-black uppercase tracking-tighter">
+                                    {{ i }}
+                                </span>
+                            {% elif i > estudiantes.number|add:'-3' and i < estudiantes.number|add:'3' %}
+                                <a href="?page={{ i }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-[10px] font-bold uppercase tracking-tighter">
+                                    {{ i }}
+                                </a>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if estudiantes.has_next %}
+                            <a href="?page={{ estudiantes.next_page_number }}" class="relative inline-flex items-center px-2 py-2 rounded-r-sm border border-gray-300 bg-white text-xs font-bold text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Siguiente</span>
+                                <i class="fas fa-as fa-chevron-right"></i>
+                            </a>
+                        {% else %}
+                            <span class="relative inline-flex items-center px-2 py-2 rounded-r-sm border border-gray-300 bg-gray-50 text-xs font-bold text-gray-300 cursor-not-allowed">
+                                <i class="fas fa-as fa-chevron-right"></i>
+                            </span>
+                        {% endif %}
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Back Button -->
@@ -317,6 +375,35 @@
                     </button>
                     <button type="button" onclick="confirmSend()" class="flex-1 px-4 py-2 bg-black text-white text-[10px] font-black uppercase hover:bg-gray-800 transition-colors rounded-sm tracking-widest shadow-lg">
                         SÍ, ENVIAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Eliminación de Certificados -->
+<div id="deleteCertificatesModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    <div class="flex items-center justify-center min-h-screen px-4 p-0">
+        <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75 backdrop-blur-sm" onclick="closeDeleteCertificatesModal()"></div>
+        <div class="bg-white border border-gray-300 shadow-2xl rounded-sm max-w-sm w-full relative z-10 overflow-hidden text-center">
+            <div class="bg-red-600 h-1.5 w-full"></div>
+            <div class="p-6">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50 mb-4 border border-red-100">
+                    <i class="fas fa-trash-alt text-red-600"></i>
+                </div>
+                <h3 class="text-sm font-black text-gray-900 uppercase tracking-tight mb-2">Eliminar Certificados</h3>
+                <p class="text-[10px] text-gray-500 leading-relaxed mb-6 uppercase tracking-widest font-bold">
+                    Se eliminarán <span class="text-red-600 underline">TODOS</span> los certificados generados y sus archivos físicos.<br>
+                    Esta acción no se puede deshacer.<br>
+                    <span class="text-red-500">¿ESTÁ SEGURO?</span>
+                </p>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeDeleteCertificatesModal()" class="flex-1 px-4 py-2 border border-gray-300 text-[10px] font-black uppercase text-gray-600 hover:bg-gray-50 transition-colors rounded-sm tracking-widest">
+                        CANCELAR
+                    </button>
+                    <button type="button" onclick="confirmDeleteCertificates()" class="flex-1 px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase hover:bg-red-700 transition-colors rounded-sm tracking-widest shadow-lg">
+                        SÍ, ELIMINAR TODO
                     </button>
                 </div>
             </div>

@@ -30,6 +30,7 @@ media/
 media_fallback/
 
 # Virtual Environment
+.env
 venv/
 .venv/
 

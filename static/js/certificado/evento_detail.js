@@ -453,7 +453,7 @@ function toggleQrSeguridad() {
     if (!toggle || !statusText) return;
 
     const isChecked = toggle.checked;
-    
+
     // Optimistic UI update
     statusText.textContent = isChecked ? 'ACTIVO' : 'INACTIVO';
 
@@ -477,9 +477,69 @@ function toggleQrSeguridad() {
         .catch(error => {
             console.error('Error:', error);
             showToast("ERROR DE CONEXIÓN");
-            // Revert
             toggle.checked = !isChecked;
             statusText.textContent = !isChecked ? 'ACTIVO' : 'INACTIVO';
+        });
+}
+
+
+/**
+ * Abre el modal de confirmación para eliminar TODOS los certificados
+ */
+function confirmarEliminacionCertificados() {
+    const modal = document.getElementById('deleteCertificatesModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+/**
+ * Cierra el modal de eliminación de certificados
+ */
+function closeDeleteCertificatesModal() {
+    const modal = document.getElementById('deleteCertificatesModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Ejecuta la eliminación masiva de certificados
+ */
+function confirmDeleteCertificates() {
+    closeDeleteCertificatesModal();
+
+    const formData = new FormData();
+    formData.append('action', 'delete_certificates');
+    formData.append('csrfmiddlewaretoken', csrftoken);
+
+    // Mostrar loading overlay
+    if (window.loadingOverlay) {
+        window.loadingOverlay.show('Eliminando certificados y archivos físicos...');
+    } else {
+        showToast("ELIMINANDO CERTIFICADOS...");
+    }
+
+    fetch('', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message.toUpperCase());
+
+                if (window.loadingOverlay) {
+                    window.loadingOverlay.updateMessage('¡Eliminación completada! Recargando...');
+                }
+
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(data.error.toUpperCase());
+                if (window.loadingOverlay) {
+                    window.loadingOverlay.hide();
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast("ERROR AL ELIMINAR");
+            if (window.loadingOverlay) {
+                window.loadingOverlay.hide();
+            }
         });
 }
 

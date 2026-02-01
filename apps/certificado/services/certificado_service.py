@@ -1,53 +1,70 @@
 """
 Servicio principal para orquestar la generación masiva de certificados.
 
-Este es el servicio de alto nivel que coordina todo el flujo.
+Este servicio coordina el flujo completo: desde la creación del evento y 
+carga de estudiantes, hasta la generación y envío de los certificados.
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Any
+
 from django.db import transaction
 from django.utils import timezone
-from ..models import Evento, Estudiante, Certificado, ProcesamientoLote
-from ..utils import parse_excel_estudiantes
+from django.contrib.auth.models import User
 
+from ..models import Evento, Estudiante, Certificado, ProcesamientoLote, EmailDailyLimit
+from ..utils import parse_excel_estudiantes
 
 logger = logging.getLogger(__name__)
 
 
 class CertificadoService:
     """
-    Servicio orquestador principal para generación masiva de certificados.
+    Servicio orquestador principal para la gestión de eventos de certificación.
     
-    Responsabilidades:
-    - Crear registro de Evento
-    - Parsear Excel
-    - Crear registros de Estudiantes
-    - Crear registros de Certificados (estado='pending')
-    - Crear ProcesamientoLote
-    - Encolar tareas Celery
+    Responsibilities:
+        - Creación de eventos y nóminas (importación Excel).
+        - Iniciación de generación masiva (PDFs).
+        - Iniciación de envío masivo (Emails).
     """
     
     @staticmethod
     @transaction.atomic
-    def create_event_with_students(evento_data: Dict, excel_file, user, estudiantes_data=None) -> Evento:
+    def create_event_with_students(
+        evento_data: Dict[str, Any], 
+        excel_file: Optional[Any], 
+        user: User, 
+        estudiantes_data: Optional[List[Dict[str, str]]] = None
+    ) -> Evento:
         """
-        Paso 1: Crea el Evento y los registros de Estudiantes (Nómina).
-        No inicia procesamiento de certificados aún.
+        Crea un Evento y su nómina de estudiantes asociada.
+
+        Args:
+            evento_data (Dict[str, Any]): Datos del formulario del evento.
+            excel_file (Optional[Any]): Archivo Excel subido (request.FILES).
+            user (User): Usuario que crea el evento.
+            estudiantes_data (Optional[List[Dict]]): Datos de estudiantes ya procesados (opcional).
+
+        Returns:
+            Evento: La instancia del evento creado.
+
+        Raises:
+            ValueError: Si no se proveen datos de estudiantes válidos.
         """
         try:
-            logger.info("Iniciando creación de evento y nómina")
+            logger.info(f"Iniciando creación de evento por usuario: {user.username}")
             
-            # 1. Parsear Excel o usar datos proporcionados
-            if estudiantes_data is None:
-                if excel_file is None:
-                    raise ValueError("Se debe proporcionar un archivo Excel o datos de estudiantes")
+            # 1. Preparar datos de estudiantes
+            if not estudiantes_data:
+                if not excel_file:
+                    raise ValueError("Debe proporcionar un archivo Excel o datos de estudiantes.")
+                
                 logger.info("Parseando archivo Excel...")
                 estudiantes_data = parse_excel_estudiantes(excel_file)
             
             num_estudiantes = len(estudiantes_data)
             if num_estudiantes == 0:
-                raise ValueError("El archivo Excel no contiene estudiantes")
+                raise ValueError("La lista de estudiantes está vacía.")
             
             # 2. Crear Evento
             evento = Evento.objects.create(
@@ -66,133 +83,168 @@ class CertificadoService:
                 contenido_programa=evento_data['contenido_programa'],
             )
             
-            # 3. Crear Estudiantes en bulk
-            estudiantes_to_create = [
+            # 3. Crear Estudiantes (Bulk Insert para eficiencia)
+            estudiantes_objs = [
                 Estudiante(
                     evento=evento,
-                    nombres_completos=est_data['nombres_completos'],
-                    correo_electronico=est_data['correo_electronico']
+                    nombres_completos=est['nombres_completos'],
+                    correo_electronico=est['correo_electronico']
                 )
-                for est_data in estudiantes_data
+                for est in estudiantes_data
             ]
-            Estudiante.objects.bulk_create(estudiantes_to_create)
+            Estudiante.objects.bulk_create(estudiantes_objs)
             
-            logger.info(f"Evento {evento.id} creado con {num_estudiantes} estudiantes")
+            logger.info(f"Evento {evento.id} creado exitosamente con {num_estudiantes} estudiantes.")
             return evento
             
         except Exception as e:
-            logger.error(f"Error en create_event_with_students: {str(e)}", exc_info=True)
+            logger.error(f"Error creando evento: {e}", exc_info=True)
             raise
 
     @staticmethod
     def initiate_generation_lote(evento_id: int) -> ProcesamientoLote:
         """
-        Paso 2: Inicia la generación de certificados para un evento.
-        Crea registros de Certificado 'pending' y encola tareas Celery.
+        Inicia el proceso asíncrono de generación de certificados (PDFs).
+
+        Crea los registros de certificado en estado 'pending' y el lote de procesamiento,
+        luego encola las tareas individuales.
+
+        Args:
+            evento_id (int): ID del evento a procesar.
+
+        Returns:
+            ProcesamientoLote: El objeto de seguimiento del lote.
         """
-        from ..tasks import generate_certificate_task
+        # Importación local para evitar dependencias circulares
+        # Importación local para evitar dependencias circulares
+        from ..tasks import generate_certificate_task, generate_certificate_batch_task
+        
         
         try:
             evento = Evento.objects.get(id=evento_id)
             estudiantes = Estudiante.objects.filter(evento=evento)
-            num_estudiantes = estudiantes.count()
+            total = estudiantes.count()
             
-            if num_estudiantes == 0:
-                raise ValueError("El evento no tiene estudiantes registrados")
-                
-            # 1. Crear/Actualizar Certificados y encolar tareas
+            if total == 0:
+                raise ValueError("El evento no tiene estudiantes registrados.")
+
+            # 1. Preparar registros de Certificado
+            certificado_ids = []
+            
+            # Usamos get_or_create para manejar reintentos sin duplicar
             for estudiante in estudiantes:
-                certificado, _ = Certificado.objects.get_or_create(
+                cert, created = Certificado.objects.get_or_create(
                     evento=evento,
                     estudiante=estudiante,
                     defaults={'estado': 'pending'}
                 )
                 
-                # Si ya existía, resetear estado para que se procese
-                if certificado.estado != 'pending':
-                    certificado.estado = 'pending'
-                    certificado.save()
+                # Si ya existe (reintento), resetear a pending
+                if not created and cert.estado != 'pending':
+                    cert.estado = 'pending'
+                    cert.error_mensaje = ''
+                    cert.save(update_fields=['estado', 'error_mensaje'])
                 
-                # Encolar tarea
-                try:
-                    generate_certificate_task.delay(certificado.id)
-                except Exception as e:
-                    logger.error(f"Error al encolar tarea para certificado {certificado.id}: {str(e)}")
-                    raise
+                certificado_ids.append(cert.id)
 
+            # 2. Encolar tareas en LOTES (Chunking) optimization
+            BATCH_SIZE = 20
+            # Dividir lista de IDs en chunks de 20
+            chunks = [certificado_ids[i:i + BATCH_SIZE] for i in range(0, len(certificado_ids), BATCH_SIZE)]
             
-            # 2. Crear/Actualizar ProcesamientoLote
+            logger.info(f"Encolando {len(chunks)} lotes de generación (Total: {len(certificado_ids)} certs)")
+            
+            for chunk_ids in chunks:
+                generate_certificate_batch_task.delay(chunk_ids)
+
+            # 3. Gestionar Lote de Procesamiento
             lote, created = ProcesamientoLote.objects.get_or_create(
                 evento=evento,
                 defaults={
-                    'total_estudiantes': num_estudiantes,
+                    'total_estudiantes': total,
                     'estado': 'pending',
                     'fecha_inicio': timezone.now()
                 }
             )
             
             if not created:
-                lote.total_estudiantes = num_estudiantes
+                # Resetear lote existente
+                lote.total_estudiantes = total
                 lote.procesados = 0
                 lote.exitosos = 0
                 lote.fallidos = 0
-                lote.estado = 'pending'
+                lote.estado = 'processing'
                 lote.fecha_inicio = timezone.now()
                 lote.fecha_fin = None
                 lote.save()
+            else:
+                lote.estado = 'processing'
+                lote.save()
             
-            lote.estado = 'processing'
-            lote.save()
-            
-            logger.info(f"Lote de generación iniciado para Evento {evento_id}")
+            logger.info(f"Generación iniciada para evento {evento_id}. Lote {lote.id}.")
             return lote
-            
+
         except Exception as e:
-            logger.error(f"Error en initiate_generation_lote: {str(e)}")
+            logger.error(f"Error iniciando generación para evento {evento_id}: {e}", exc_info=True)
             raise
 
     @staticmethod
-    def initiate_sending_lote(evento_id: int):
+    def initiate_sending_lote(evento_id: int) -> Tuple[int, str]:
         """
-        Paso 3: Encola el envío masivo de certificados ya generados.
+        Inicia el envío masivo de certificados por correo electrónico.
+
+        Verifica límites diarios, actualiza estados y encola tareas de envío.
+
+        Args:
+            evento_id (int): ID del evento.
+
+        Returns:
+            Tuple[int, str]: (Cantidad de envíos encolados, Mensaje de estado).
         """
+        # Importación local para evitar dependencias circulares
         from ..tasks import send_certificate_email_task
-        from apps.certificado.models import EmailDailyLimit, Certificado
         
         try:
             evento = Evento.objects.get(id=evento_id)
+            
+            # Buscar certificados listos para enviar
+            # Deben estar 'completed' (generados) y tener archivo PDF
             certificados = Certificado.objects.filter(
                 evento=evento, 
                 estado='completed',
                 archivo_pdf__isnull=False
+            ).exclude(archivo_pdf='')
+            
+            count = certificados.count()
+            if count == 0:
+                return 0, "No hay certificados generados listos para enviar."
+            
+            # Verificar límite diario de correos
+            permitido, _, mensaje_limite = EmailDailyLimit.puede_enviar_lote(count)
+            if not permitido:
+                raise ValueError(mensaje_limite)
+            
+            # Actualización masiva de estado a 'sending_email'
+            # Esto bloquea reintentos inmediatos y actualiza la UI
+            cert_ids = list(certificados.values_list('id', flat=True))
+            certificados.update(
+                estado='sending_email', 
+                updated_at=timezone.now()
             )
             
-            num_a_enviar = certificados.count()
-            if num_a_enviar == 0:
-                return 0, "No hay certificados listos para enviar."
-                
-            # Verificar límite
-            puede_enviar, restantes, mensaje = EmailDailyLimit.puede_enviar_lote(num_a_enviar)
-            if not puede_enviar:
-                raise ValueError(mensaje)
-            
-            # IMPORTANTE: Cambiar estado masivamente a 'sending_email' ANTES de encolar
-            # Esto asegura que la barra de progreso baje a 0% inmediatamente,
-            # ya que 'completed' cuenta como finalizado en la lógica de progreso.
-            cert_ids = list(certificados.values_list('id', flat=True))
-            certificados.update(estado='sending_email', updated_at=timezone.now())
-                
+            # Encolar tareas
             for cert_id in cert_ids:
                 send_certificate_email_task.delay(cert_id)
             
-            # Asegurarse que el lote refleje que está procesando (emails)
+            # Actualizar estado del lote si existe
             lote = ProcesamientoLote.objects.filter(evento=evento).first()
             if lote:
                 lote.estado = 'processing'
-                lote.save()
+                lote.save(update_fields=['estado'])
                 
-            return num_a_enviar, "Envío masivo encolado exitosamente."
+            logger.info(f"Envío iniciado para evento {evento_id}. {count} correos encolados.")
+            return count, "Envío masivo encolado exitosamente."
             
         except Exception as e:
-            logger.error(f"Error en initiate_sending_lote: {str(e)}", exc_info=True)
-            raise e
+            logger.error(f"Error iniciando envío para evento {evento_id}: {e}", exc_info=True)
+            raise

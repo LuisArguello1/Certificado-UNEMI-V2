@@ -282,24 +282,7 @@
                 <div class="p-6">
                     <form action="{% url 'certificado:tipo_create' %}" method="post" class="space-y-4" @submit="submitCreateForm">
                         {% csrf_token %}
-                        <div id="create-form-container">
-                            <!-- El contenido inicial se carga server-side si usamos el form en el contexto o AJAX -->
-                            <!-- Como ModalidadCreateView retorna template modalidad_form.html, aquí deberíamos incluirlo o cargarlo -->
-                            <!-- Para simplificar, asumimos que create_form (instancia del form) no se pasa al list view por defecto. 
-                                 Pero podemos hacer un fetch o simplemente renderizar los campos si los pasamos.
-                                 Dado que es AJAX modal, lo ideal es cargar el form via AJAX al abrir o tenerlo pre-renderizado.
-                                 En user_list.html, 'create_form' estaba en el contexto. 
-                                 En catalogo_views no pusimos el form en el context del ListView.
-                                 Vamos a ajustar para que el modal haga fetch del form create si es necesario, 
-                                 o mejor: usar el mismo mecanismo de 'openEditModal' pero para Create?
-                                 O modificar ListView para incluir el form vacío. 
-                                 Vamos a optar por incluir el form en el contexto del ListView en catalogo_views.py después.
-                                 Por ahora, usaré un include si existiera, pero como no existe, haré un fetch al abrir o renderizaré via include.
-                                 -->
-                                 <!-- Solución rápida: Usar hx-get o similar? No, estamos con Alpine. 
-                                      Vamos a cambiar la estrategia: hacer que el botón "NUEVA MODALIDAD" también cargue el form vía AJAX 
-                                      igual que el edit, para no complicar el contexto del ListView. -->
-                        </div>
+                        <div id="create-form-container"></div>
                         <div class="pt-4 border-t border-gray-100 flex justify-end space-x-2">
                             <button type="button" @click="showCreateModal = false" class="px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">Cancelar</button>
                             <button type="submit" class="px-3 py-1.5 border border-transparent text-xs font-medium rounded-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase">
@@ -480,13 +463,4 @@
     </div>
 
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    document.addEventListener('alpine:init', () => {
-        // Alpine data injection if needed
-    });
-</script>
 {% endblock %}

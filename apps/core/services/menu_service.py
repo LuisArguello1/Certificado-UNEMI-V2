@@ -5,7 +5,6 @@ class MenuService:
     Servicio para generar la estructura del menú lateral (Sidebar).
     Centraliza la definición de items y el cálculo de estado activo.
     """
-    
     @staticmethod
     def get_menu_items(current_path, user):
         """

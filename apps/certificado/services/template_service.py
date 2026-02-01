@@ -1,186 +1,135 @@
 """
 Servicio para procesar plantillas de certificado.
 
-Carga plantillas Word, inyecta variables y genera documentos.
+Gestiona la inyección de variables en plantillas Word (.docx) con un mapeo optimizado
+y estricto para maximizar el rendimiento.
 """
 
 import os
 import logging
-from typing import Dict
-from docx import Document
+from typing import Dict, Any, Optional
 from django.conf import settings
-
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
 
 class TemplateService:
     """
-    Servicio para procesar plantillas de certificado.
-    
-    Responsabilidades:
-    - Cargar plantillas Word
-    - Inyectar variables
-    - Generar documentos DOCX
+    Servicio de alto rendimiento para la generación de DOCX.
     """
     
+    # Mapeo de meses para formateo en español
+    _MONTHS = {
+        1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril',
+        5: 'mayo', 6: 'junio', 7: 'julio', 8: 'agosto',
+        9: 'septiembre', 10: 'octubre', 11: 'noviembre', 12: 'diciembre'
+    }
+
     @staticmethod
     def generate_docx(template_path: str, variables: Dict[str, str], output_path: str) -> str:
         """
-        Genera un documento DOCX desde una plantilla con variables reemplazadas.
-        
+        Genera el documento final reemplazando variables.
+
         Args:
-            template_path: Ruta absoluta a la plantilla .docx
-            variables: Diccionario de variables a reemplazar
-            output_path: Ruta donde guardar el documento generado
-        
+            template_path (str): Ruta absoluta de la plantilla.
+            variables (Dict[str, str]): Diccionario exacto de variables.
+            output_path (str): Ruta absoluta de destino.
+
         Returns:
-            Ruta absoluta del archivo generado
-        
+            str: Ruta del archivo generado.
+
         Raises:
-            FileNotFoundError: Si la plantilla no existe
-            Exception: Si hay error al generar el documento
-        
-        Ejemplo:
-            >>> from apps.certificado.services.template_service import TemplateService
-            >>> variables = {
-            ...     "NOMBRES": "Juan Pérez",
-            ...     "MODALIDAD": "Virtual",
-            ...     "NOMBRE_EVENTO": "Taller Python",
-            ...     "DURACION": "40 horas"
-            ... }
-            >>> output = TemplateService.generate_docx(
-            ...     '/path/to/template.docx',
-            ...     variables,
-            ...     '/path/to/output.docx'
-            ... )
-            >>> print(output)  # /path/to/output.docx
+            FileNotFoundError: Si falta la plantilla.
+            RuntimeError: Si falla la generación.
         """
         try:
-            # Validar que existe la plantilla
             if not os.path.exists(template_path):
                 raise FileNotFoundError(f"Plantilla no encontrada: {template_path}")
             
-            # Importar utilidad de reemplazo
+            # Importación local para evitar ciclos
             from ..utils.variable_replacer import replace_variables_in_template
             
-            # Cargar y procesar plantilla
+            # Reemplazo de variables (delegado al util especializado)
             doc = replace_variables_in_template(template_path, variables)
             
-            # Asegurar que existe el directorio de salida
+            # Asegurar directorio y guardar
             output_dir = os.path.dirname(output_path)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)
             
-            # Guardar documento
             doc.save(output_path)
             
-            # Validar que se creó el archivo
             if not os.path.exists(output_path):
-                raise Exception(f"El archivo no se generó correctamente: {output_path}")
+                raise RuntimeError(f"Fallo verificando archivo generado: {output_path}")
             
             return output_path
             
         except Exception as e:
-            logger.error(f"Error al generar DOCX: {str(e)}")
+            logger.error(f"Error generando DOCX: {e}")
             raise
-    
-    @staticmethod
-    def get_variables_from_evento_estudiante(evento, estudiante) -> Dict[str, str]:
+
+    @classmethod
+    def get_variables_from_evento_estudiante(cls, evento: Any, estudiante: Any) -> Dict[str, str]:
         """
-        Construye el diccionario de variables desde un Evento y Estudiante.
+        Genera el diccionario de variables optimizado.
         
+        Variables Estrictas:
+            - TIPO
+            - TIPO DE EVENTO
+            - NOMBRE CURSO
+            - HORAS
+            - FECHA INICIO
+            - FECHA FIN
+            - FECHA DE EMISION
+            - OBJETIVO DEL PROGRAMA
+            - CONTENIDO
+            - MODALIDAD
+            - NOMBRES (Requerido para reemplazo de nombre estudiante)
+
         Args:
-            evento: Instancia del modelo Evento
-            estudiante: Instancia del modelo Estudiante
-        
+            evento: Instancia de Evento.
+            estudiante: Instancia de Estudiante.
+
         Returns:
-            Diccionario con todas las variables universales
-        
-        Ejemplo:
-            >>> evento = Evento.objects.get(id=1)
-            >>> estudiante = Estudiante.objects.get(id=1)
-            >>> variables = TemplateService.get_variables_from_evento_estudiante(evento, estudiante)
-            >>> print(variables)
-            {
-                'NOMBRES': 'Juan Pérez',
-                'MODALIDAD': 'Virtual',
-                ...
-            }
+            Dict[str, str]: Mapeo plano llave-valor.
         """
-        # Diccionario para meses en español (Capitalizados para el formato del usuario)
-        meses = {
-            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
-            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
-            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
-        }
+        
+        # 1. Helpers de formateo
+        def fmt_date_simple(d: Optional[date]) -> str:
+            """Ej: 16 de septiembre"""
+            if not d: return ''
+            return f"{d.day} de {cls._MONTHS[d.month]}"
+        
+        def fmt_date_full_del(d: Optional[date]) -> str:
+            """Ej: 20 de septiembre del 2025"""
+            if not d: return ''
+            return f"{d.day} de {cls._MONTHS[d.month]} del {d.year}"
+            
+        def fmt_date_emission(d: Optional[date]) -> str:
+            """Ej: 30 de días del mes de septiembre del 2025"""
+            if not d: return ''
+            # El formato solicitado suele ser "a los X días del mes..."
+            # Ajustamos a lo que el usuario pidió: FECHA DE EMISION
+            return f"{d.day} días del mes de {cls._MONTHS[d.month]} del {d.year}"
 
-        def format_fecha_es(fecha):
-            """Formato completo: 16 de Septiembre de 2025"""
-            if not fecha: return ''
-            return f"{fecha.day} de {meses[fecha.month]} de {fecha.year}"
-        
-        def format_fecha_sin_anio(fecha):
-            """Formato sin año: 16 de septiembre"""
-            if not fecha: return ''
-            return f"{fecha.day} de {meses[fecha.month].lower()}"
-        
-        def format_fecha_con_del(fecha):
-            """Formato con 'del': 20 de septiembre del 2025"""
-            if not fecha: return ''
-            return f"{fecha.day} de {meses[fecha.month].lower()} del {fecha.year}"
-        
-        def format_fecha_emision_especial(fecha):
-            """Formato especial: 30 días del mes de septiembre del 2025"""
-            if not fecha: return ''
-            return f"{fecha.day} días del mes de {meses[fecha.month].lower()} del {fecha.year}"
-
-        # Formatear fechas con diferentes formatos
-        fecha_inicio_str = format_fecha_es(evento.fecha_inicio)
-        fecha_fin_str = format_fecha_es(evento.fecha_fin)
-        fecha_emision_str = format_fecha_es(evento.fecha_emision)
-        
-        # Formatos adicionales para las variables con espacio
-        fecha_inicio_sin_anio = format_fecha_sin_anio(evento.fecha_inicio)  # "16 de septiembre"
-        fecha_fin_con_del = format_fecha_con_del(evento.fecha_fin)  # "20 de septiembre del 2025"
-        
-        # Partes de la fecha para mayor flexibilidad
-        dia_emision = str(evento.fecha_emision.day) if evento.fecha_emision else ''
-        mes_emision = meses[evento.fecha_emision.month] if evento.fecha_emision else ''
-        anio_emision = str(evento.fecha_emision.year) if evento.fecha_emision else ''
-        mes_anio_emision = f"{mes_emision} de {anio_emision}" if evento.fecha_emision else ''
-        
-        # Construir diccionario con todas las variables universales
-        # Nota: No todas las variables estarán en todas las plantillas, y eso está bien
-        variables = {
+        # 2. Construcción directa del diccionario
+        return {
+            # Variable crítica de identidad
             'NOMBRES': estudiante.nombres_completos.upper(),
-            'MODALIDAD': evento.modalidad.nombre if evento.modalidad else '',
-            'NOMBRE_EVENTO': evento.nombre_evento,
-            'NOMBRE CURSO': evento.nombre_evento,
-            'DURACION': f'{evento.duracion_horas}' if evento.duracion_horas else '0',
-            'HORAS': f'{evento.duracion_horas}' if evento.duracion_horas else '0',
-            # Variables de fecha con guión bajo (formato completo)
-            'FECHA_INICIO': fecha_inicio_str,
-            'FECHA_FIN': fecha_fin_str,
-            # Variables de fecha con espacio (formatos especiales)
-            'FECHA INICIO': fecha_inicio_sin_anio,  # "16 de septiembre"
-            'FECHA FIN': fecha_fin_con_del,  # "20 de septiembre del 2025"
-            # Tipo de evento
+            
+            # Variables de Evento
             'TIPO': evento.tipo.nombre if evento.tipo else '',
-            'TIPO_EVENTO': evento.tipo_evento.nombre if evento.tipo_evento else '',
             'TIPO DE EVENTO': evento.tipo_evento.nombre if evento.tipo_evento else '',
-            # Fechas de emisión
-            'FECHA_EMISION': fecha_emision_str,
-            'FECHA DE EMISION': format_fecha_emision_especial(evento.fecha_emision),  # "30 días del mes de septiembre del 2025"
-            'DIA_EMISION': dia_emision,
-            'MES_EMISION': mes_emision,
-            'ANIO_EMISION': anio_emision,
-            'MES_ANIO_EMISION': mes_anio_emision,
-            # Contenido del programa
-            'OBJETIVO_PROGRAMA': evento.objetivo_programa if evento.objetivo_programa else '',
-            'OBJETIVO DEL PROGRAMA': evento.objetivo_programa if evento.objetivo_programa else '',
-            'CONTENIDO': evento.contenido_programa if evento.contenido_programa else '',
+            'NOMBRE CURSO': evento.nombre_evento or '',
+            'HORAS': str(evento.duracion_horas) if evento.duracion_horas else '0',
+            'MODALIDAD': evento.modalidad.nombre if evento.modalidad else '',
+            
+            # Fechas con formatos específicos
+            'FECHA INICIO': fmt_date_simple(evento.fecha_inicio),
+            'FECHA FIN': fmt_date_full_del(evento.fecha_fin),
+            'FECHA DE EMISION': fmt_date_emission(evento.fecha_emision),
+            
+            # Contenidos largos
+            'OBJETIVO DEL PROGRAMA': evento.objetivo_programa or '',
+            'CONTENIDO': evento.contenido_programa or '',
         }
-        
-        # Variables construidas
-        return variables

@@ -7,10 +7,9 @@ from .certificado_views import (
     ProcesamientoStatusView,
     EventoDetailView,
     CertificadoListView,
-    get_variantes_api,
-    get_plantillas_api,
     CertificadoPreviewView
 )
+from .api_views import get_variantes_api, get_plantillas_api
 from .plantilla_views import (
     PlantillaListView,
     PlantillaDetailView,

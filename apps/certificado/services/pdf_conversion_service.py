@@ -1,20 +1,22 @@
 """
 Servicio para convertir documentos DOCX a PDF usando LibreOffice.
+
+Este módulo encapsula la lógica de conversión de documentos, manejando
+la interacción con el proceso headless de LibreOffice.
 """
 
 import os
 import subprocess
 import logging
+import tempfile
+from typing import Optional
 from django.conf import settings
-
 
 logger = logging.getLogger(__name__)
 
 
 class PDFConversionError(Exception):
-    """
-    Error durante la conversión de DOCX a PDF.
-    """
+    """Excepción lanzada cuando falla la conversión de DOCX a PDF."""
     pass
 
 
@@ -22,124 +24,209 @@ class PDFConversionService:
     """
     Servicio para convertir documentos DOCX a PDF usando LibreOffice headless.
     
-    Requiere LibreOffice instalado en el sistema.
+    Gestiona la ejecución del subproceso, timeouts y perfiles de usuario temporales
+    para evitar conflictos de bloqueo.
     """
     
     @staticmethod
-    def convert_docx_to_pdf(docx_path: str, output_dir: str = None) -> str:
+    def convert_docx_to_pdf(docx_path: str, output_dir: Optional[str] = None) -> str:
         """
-        Convierte un archivo DOCX a PDF usando LibreOffice headless.
-        
+        Convierte un archivo DOCX a PDF.
+
         Args:
-            docx_path: Ruta absoluta al archivo .docx
-            output_dir: Directorio donde guardar el PDF (si None, usa el mismo directorio que el DOCX)
-        
+            docx_path (str): Ruta absoluta al archivo .docx.
+            output_dir (Optional[str]): Directorio de salida. Si es None, usa el del DOCX.
+
         Returns:
-            Ruta absoluta del archivo PDF generado
-        
+            str: Ruta absoluta del archivo PDF generado.
+
         Raises:
-            PDFConversionError: Si la conversión falla
-            FileNotFoundError: Si LibreOffice no está instalado o el DOCX no existe
-        
-        Ejemplo:
-            >>> from apps.certificado.services.pdf_conversion_service import PDFConversionService
-            >>> pdf_path = PDFConversionService.convert_docx_to_pdf('/path/to/certificado.docx')
-            >>> print(pdf_path)  # /path/to/certificado.pdf
+            FileNotFoundError: Si el archivo DOCX no existe.
+            PDFConversionError: Si ocurre un error en la conversión o timeout.
         """
         try:
-            # Validar que existe el archivo DOCX
             if not os.path.exists(docx_path):
                 raise FileNotFoundError(f"Archivo DOCX no encontrado: {docx_path}")
             
-            # Determinar directorio de salida
+            # Configurar directorio de salida
             if output_dir is None:
                 output_dir = os.path.dirname(docx_path)
             
-            # Crear directorio si no existe
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)
             
-            # Obtener ruta de LibreOffice desde settings
+            # Configuración de LibreOffice
             libreoffice_path = getattr(settings, 'LIBREOFFICE_PATH', 'soffice')
             
-            # Usar un perfil compartido en lugar de crear uno nuevo cada vez
-            import tempfile
+            # Usar perfil compartido para rendimiento y evitar bloqueos en concurrencia
             shared_profile_dir = os.path.join(tempfile.gettempdir(), "LO_shared_profile")
+            os.makedirs(shared_profile_dir, exist_ok=True)
             
-            # Crear el perfil compartido solo si no existe
-            if not os.path.exists(shared_profile_dir):
-                os.makedirs(shared_profile_dir, exist_ok=True)
+            # Formato URL para UserInstallation (compatible Windows/Linux)
+            user_inst_url = f"file:///{shared_profile_dir.replace(os.sep, '/')}"
             
-            # Convertir a formato URL file:/// compatible con Windows/Linux
-            user_installation_url = f"file:///{shared_profile_dir.replace(os.sep, '/')}"
-            
-            # Comando para LibreOffice headless con perfil compartido y optimizaciones
+            # Flags optimizados para ejecución headless segura
             command = [
                 libreoffice_path,
-                f"-env:UserInstallation={user_installation_url}",
+                f"-env:UserInstallation={user_inst_url}",
                 '--headless',
                 '--convert-to', 'pdf',
                 '--outdir', output_dir,
-                '--norestore',  # No restaurar sesión anterior
-                '--nofirststartwizard',  # Sin wizard de primera vez
-                '--nologo',  # Sin logo de splash
-                '--nolockcheck',  # No verificar bloqueos de archivo
+                '--norestore',          # No intentar restaurar documentos previos
+                '--nofirststartwizard', # Saltar wizard de inicio
+                '--nologo',             # Sin splash screen
+                '--nolockcheck',        # Ignorar archivos de bloqueo .lock
+                '--nodefault',          # No iniciar con documento por defecto
                 docx_path
             ]
             
-            # Ejecutar comando
-            # Usar creación de ventana oculta en Windows para evitar popups
+            # Configurar startupinfo para ocultar ventana en Windows
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             
+            logger.debug(f"Ejecutando conversión PDF para: {docx_path}")
+            
+            # Ejecutar conversión con timeout
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
-                timeout=30,  # Timeout optimizado a 30 segundos
-                startupinfo=startupinfo if os.name == 'nt' else None
+                timeout=30,  # Timeout generoso pero seguro
+                startupinfo=startupinfo
             )
             
-            # Verificar si hubo error
             if result.returncode != 0:
-                error_msg = result.stderr or result.stdout
-                logger.error(f"Error en conversión LibreOffice: {error_msg}")
-                raise PDFConversionError(
-                    f"LibreOffice retornó código {result.returncode}: {error_msg}"
-                )
+                error_msg = result.stderr or result.stdout or "Error desconocido"
+                logger.error(f"Fallo LibreOffice (Exit Code {result.returncode}): {error_msg}")
+                raise PDFConversionError(f"Error convirtiendo PDF: {error_msg}")
             
-            # Construir ruta del PDF generado
-            docx_filename = os.path.basename(docx_path)
-            pdf_filename = os.path.splitext(docx_filename)[0] + '.pdf'
+            # Verificar resultado
+            filename = os.path.basename(docx_path)
+            pdf_filename = os.path.splitext(filename)[0] + '.pdf'
             pdf_path = os.path.join(output_dir, pdf_filename)
             
-            # Validar que se generó el PDF
             if not os.path.exists(pdf_path):
-                raise PDFConversionError(
-                    f"El PDF no se generó correctamente. Esperado en: {pdf_path}"
-                )
+                # A veces LibreOffice falla silenciosamente o cambia el nombre
+                raise PDFConversionError(f"El archivo PDF no se generó en la ruta esperada: {pdf_path}")
+                
             return pdf_path
             
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout al convertir DOCX a PDF: {docx_path}")
-            raise PDFConversionError(f"Timeout al convertir documento (>30s)")
+            logger.error(f"Timeout (30s) al convertir documento: {docx_path}")
+            raise PDFConversionError("La conversión excedió el tiempo límite.")
+            
         except Exception as e:
-            logger.error(f"Error al convertir DOCX a PDF: {str(e)}")
-            raise
+            if isinstance(e, (FileNotFoundError, PDFConversionError)):
+                raise
+            logger.error(f"Excepción no manejada en conversión PDF: {e}", exc_info=True)
+            raise PDFConversionError(f"Error interno de conversión: {e}")
+
+    @staticmethod
+    def convert_batch_docx_to_pdf(docx_paths: list[str], output_dir: Optional[str] = None) -> dict[str, str]:
+        """
+        Convierte múltiples archivos DOCX a PDF en UNA SOLA ejecución de LibreOffice.
+        
+        Esta optimización reduce drásticamente el tiempo total al amortizar
+        el costo de inicio del proceso soffice.
+
+        Args:
+            docx_paths: Lista de rutas absolutas a archivos .docx
+            output_dir: Directorio de salida. Si es None, usa el directorio del primer archivo.
+
+        Returns:
+            Dict[docx_path, pdf_path]: Mapeo de archivos convertidos exitosamente.
+        """
+        if not docx_paths:
+            return {}
+
+        try:
+            # Validación básica
+            valid_paths = [p for p in docx_paths if os.path.exists(p)]
+            if not valid_paths:
+                logger.warning("Ningún archivo DOCX válido para conversión por lotes.")
+                return {}
+
+            # Definir directorio de salida común
+            if output_dir is None:
+                output_dir = os.path.dirname(valid_paths[0])
+            os.makedirs(output_dir, exist_ok=True)
+
+            # Configuración LibreOffice (reutilizando lógica)
+            libreoffice_path = getattr(settings, 'LIBREOFFICE_PATH', 'soffice')
+            shared_profile_dir = os.path.join(tempfile.gettempdir(), "LO_shared_profile")
+            os.makedirs(shared_profile_dir, exist_ok=True)
+            user_inst_url = f"file:///{shared_profile_dir.replace(os.sep, '/')}"
+
+            # Construir comando con TODOS los archivos
+            # soffice --headless --convert-to pdf --outdir <dir> file1.docx file2.docx ...
+            command = [
+                libreoffice_path,
+                f"-env:UserInstallation={user_inst_url}",
+                '--headless',
+                '--convert-to', 'pdf',
+                '--outdir', output_dir,
+                '--norestore',
+                '--nofirststartwizard',
+                '--nologo',
+                '--nolockcheck',
+                '--nodefault'
+            ] + valid_paths  # Adjuntar todos los archivos al comando
+
+            # Configuración Windows
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            logger.info(f"Iniciando conversión batch de {len(valid_paths)} archivos...")
+            
+            # Timeout dinámico: 15s base + 3s por archivo adicional
+            timeout = 15 + (3 * len(valid_paths))
+
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                startupinfo=startupinfo
+            )
+
+            if result.returncode != 0:
+                logger.error(f"Error parcial/total en batch LibreOffice: {result.stderr or result.stdout}")
+                # No lanzamos excepción aquí para intentar recuperar los que sí se generaron
+            
+            # Verificar resultados y construir mapa de retorno
+            conversion_map = {}
+            for docx_path in valid_paths:
+                filename = os.path.basename(docx_path)
+                pdf_filename = os.path.splitext(filename)[0] + '.pdf'
+                pdf_path = os.path.join(output_dir, pdf_filename)
+                
+                if os.path.exists(pdf_path):
+                    conversion_map[docx_path] = pdf_path
+                else:
+                    logger.warning(f"Fallo conversión individual en batch: {docx_path}")
+
+            logger.info(f"Conversión batch finalizada. Exitosos: {len(conversion_map)}/{len(valid_paths)}")
+            return conversion_map
+
+        except Exception as e:
+            logger.error(f"Error crítico en conversión batch: {e}", exc_info=True)
+            raise PDFConversionError(f"Fallo en batch processing: {e}")
     
     @staticmethod
     def verify_libreoffice_installed() -> bool:
         """
-        Verifica si LibreOffice está instalado y accesible.
-        
+        Verifica la disponibilidad del binario de LibreOffice.
+
         Returns:
-            True si LibreOffice está disponible, False en caso contrario
+            bool: True si se puede ejecutar, False en caso contrario.
         """
         try:
             libreoffice_path = getattr(settings, 'LIBREOFFICE_PATH', 'soffice')
             
+            # Sin flags complejos, solo versión
             result = subprocess.run(
                 [libreoffice_path, '--version'],
                 capture_output=True,
@@ -147,13 +234,17 @@ class PDFConversionService:
                 timeout=5
             )
             
-            if result.returncode == 0:
-                logger.info(f"LibreOffice encontrado: {result.stdout.strip()}")
-                return True
+            is_valid = result.returncode == 0
+            if is_valid:
+                logger.debug(f"LibreOffice detectado: {result.stdout.strip()}")
             else:
-                logger.warning(f"LibreOffice no responde correctamente")
-                return False
+                logger.warning(f"LibreOffice retornó error al verificar versión: {result.stderr}")
                 
+            return is_valid
+            
+        except FileNotFoundError:
+            logger.warning("Ejecutable de LibreOffice no encontrado en el PATH o ruta configurada.")
+            return False
         except Exception as e:
-            logger.warning(f"LibreOffice no disponible: {str(e)}")
+            logger.warning(f"Error verificando LibreOffice: {e}")
             return False
