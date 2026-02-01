@@ -241,3 +241,95 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+
+// =========================================================================
+// MODAL SELECTOR DE DIRECCIONES
+// =========================================================================
+
+document.addEventListener('DOMContentLoaded', function () {
+    const selectBtn = document.getElementById('selectDireccionBtn');
+    const modal = document.getElementById('direccionModal');
+    const closeBtn = document.getElementById('closeDireccionModal');
+    const direccionesGrid = document.getElementById('direccionesGrid');
+    const hiddenInput = document.getElementById('id_direccion');
+    const displayDiv = document.getElementById('selectedDireccionDisplay');
+
+    if (!selectBtn || !modal) return;
+
+    // Abrir modal
+    selectBtn.addEventListener('click', function () {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        cargarDirecciones();
+    });
+
+    // Cerrar modal
+    closeBtn?.addEventListener('click', function () {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    });
+
+    // Cerrar al hacer click fuera
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    });
+
+    // Cargar direcciones desde el dataset del select button
+    function cargarDirecciones() {
+        // Obtener direcciones desde atributo data del botón o global
+        const direccionesData = window.DIRECCIONES_DATA || [];
+
+        if (direccionesData.length === 0) {
+            direccionesGrid.innerHTML = '<p class="text-center text-gray-500 text-sm py-8">No hay direcciones disponibles.</p>';
+            return;
+        }
+
+        direccionesGrid.innerHTML = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${direccionesData.map(dir => `
+                    <button type="button" class="direccion-card text-left p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all ${!dir.activo ? 'opacity-50' : ''}" data-id="${dir.id}" data-nombre="${dir.nombre}" data-codigo="${dir.codigo}">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-folder text-indigo-600 text-xl"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-sm font-bold text-gray-900 truncate">${dir.nombre}</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Código: ${dir.codigo}</p>
+                                ${!dir.activo ? '<span class="inline-block mt-1 text-[9px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">INACTIVA</span>' : '<span class="inline-block mt-1 text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">ACTIVA</span>'}
+                            </div>
+                        </div>
+                    </button>
+                `).join('')}
+            </div>
+        `;
+
+        // Event listeners para cada card
+        document.querySelectorAll('.direccion-card').forEach(card => {
+            card.addEventListener('click', function () {
+                const id = this.dataset.id;
+                const nombre = this.dataset.nombre;
+                const codigo = this.dataset.codigo;
+
+                // Actualizar input hidden
+                hiddenInput.value = id;
+
+                // Actualizar display
+                displayDiv.innerHTML = `
+                    <i class="fas fa-folder text-indigo-600 mr-3 text-xl"></i>
+                    <div>
+                        <span class="block text-sm font-bold text-gray-900">${nombre}</span>
+                        <span class="text-xs text-gray-500">Código: ${codigo}</span>
+                    </div>
+                `;
+
+                // Cerrar modal
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            });
+        });
+    }
+});
+

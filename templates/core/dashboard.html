@@ -1,24 +1,34 @@
 {% extends 'layouts/base.html' %}
 {% load widget_tweaks %}
+{% load static %}
 {% block title %}Dashboard - Certificados UNEMI{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 md:p-6">
-    <div class="max-w-[1920px] mx-auto space-y-4">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 lg:p-8">
+    <div class="max-w-[1400px] mx-auto space-y-6">
         
+        <!-- Header Section -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-slate-800 mb-1">Panel de Control</h1>
+            <p class="text-sm text-slate-500">Resumen general del sistema de certificados</p>
+        </div>
+
         <!-- SECCIÓN 0: Alerta de Almacenamiento NAS -->
         {% if not storage_status.is_online %}
-        <div class="backdrop-blur-md bg-red-50/90 border-l-4 border-red-500 p-4 shadow-sm mb-6 animate-pulse">
-            <div class="flex items-start">
-                <div class="flex-shrink-0">
+        <div class="bg-white border-l-4 border-red-500 rounded-lg shadow-sm p-5 mb-6 animate-pulse">
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                     <i class="fas fa-server text-red-600 text-lg"></i>
                 </div>
-                <div class="ml-4">
-                    <h3 class="text-sm font-bold text-red-800 uppercase tracking-tight">ALERTA TÉCNICA: ALMACENAMIENTO NAS NO DISPONIBLE</h3>
-                    <div class="mt-2 text-xs text-red-700 space-y-1 font-mono">
-                        <p><span class="font-bold">Error:</span> {{ storage_status.message }}</p>
-                        <p><span class="font-bold">Impacto:</span> No se pueden generar certificados, subir plantillas ni procesar Excels de estudiantes.</p>
-                        <p><span class="font-bold">Acción:</span> Verifique la conexión de red con el NAS Synology y que la unidad de red esté correctamente montada.</p>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                        <h3 class="text-sm font-bold text-red-800 uppercase tracking-wide">Alerta Técnica</h3>
+                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">NAS Desconectado</span>
+                    </div>
+                    <div class="space-y-2 text-sm text-red-700">
+                        <p><span class="font-semibold">Error:</span> {{ storage_status.message }}</p>
+                        <p><span class="font-semibold">Impacto:</span> No se pueden generar certificados, subir plantillas ni procesar archivos Excel.</p>
+                        <p><span class="font-semibold">Acción:</span> Verifique la conexión de red con el NAS Synology.</p>
                     </div>
                 </div>
             </div>
@@ -26,36 +36,247 @@
         {% endif %}
 
         <!-- SECCIÓN 0.5: Estado del Límite Diario de Correos -->
-        <div class="backdrop-blur-sm bg-indigo-50/90 border-l-4 border-indigo-500 p-4 shadow-sm mb-6">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-paper-plane text-indigo-600 text-lg"></i>
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 mb-6">
+            <div class="flex items-center justify-between flex-wrap gap-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-paper-plane text-indigo-600"></i>
                     </div>
-                    <div class="ml-4">
-                        <h3 class="text-sm font-bold text-indigo-800 uppercase tracking-tight">Límite Diario de Envíos</h3>
-                        <p class="mt-1 text-xs text-indigo-700">
-                            Has enviado <span class="font-bold">{{ email_sent_today }}</span> de <span class="font-bold">{{ email_daily_limit }}</span> correos permitidos hoy.
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-800 mb-1">Límite Diario de Envíos</h3>
+                        <p class="text-sm text-slate-600">
+                            <span class="font-bold text-indigo-600">{{ email_sent_today }}</span> de <span class="font-semibold">{{ email_daily_limit }}</span> correos enviados hoy
                         </p>
                     </div>
                 </div>
-                <div class="w-full sm:w-64">
-                    <div class="flex justify-between text-[10px] text-indigo-600 mb-1 font-semibold uppercase">
-                        <span>Uso Diario</span>
-                        <span>{{ email_daily_percent }}%</span>
+                <div class="w-full sm:w-80">
+                    <div class="flex justify-between text-xs text-slate-600 mb-2 font-medium">
+                        <span>Capacidad utilizada</span>
+                        <span class="text-indigo-600 font-semibold">{{ email_daily_percent }}%</span>
                     </div>
-                    <div class="w-full bg-indigo-200/50 h-2.5 rounded-full overflow-hidden">
-                        <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full transition-all duration-500 rounded-full" style="width: {{ email_daily_percent }}%"></div>
+                    <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                        <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full transition-all duration-500 ease-out rounded-full shadow-sm" style="width: {{ email_daily_percent }}%"></div>
                     </div>
-                    <div class="text-[10px] text-indigo-500 mt-1 text-right">
-                        Restantes: <span class="font-bold">{{ email_remaining_today }}</span>
+                    <div class="text-xs text-slate-500 mt-2 text-right">
+                        <span class="font-semibold text-slate-700">{{ email_remaining_today }}</span> correos restantes
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- SECCIÓN 1: KPIs Principales -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            
+            <!-- KPI: Total Eventos -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Total Eventos</p>
+                        <h4 class="text-3xl font-bold text-slate-800 mb-1">{{ stats.total_eventos }}</h4>
+                    </div>
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-calendar-alt text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI: Certificados -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Certificados</p>
+                        <h4 class="text-3xl font-bold text-slate-800 mb-1">{{ stats.total_certificados }}</h4>
+                        <p class="text-xs text-green-600 font-medium mt-1">
+                            <i class="fas fa-check-circle mr-1"></i>{{ stats.certs_completados }} generados
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-certificate text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI: Estudiantes -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Total Estudiantes</p>
+                        <h4 class="text-3xl font-bold text-slate-800 mb-1">{{ stats.estudiantes_total }}</h4>
+                    </div>
+                    <div class="flex-shrink-0 w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-users text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI: Estado Proceso -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Estado Proceso</p>
+                        <div class="flex gap-2 mt-2">
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow-50 border border-yellow-200">
+                                <i class="fas fa-clock text-yellow-600 text-xs"></i>
+                                <span class="text-sm font-bold text-yellow-800">{{ stats.certs_pendientes }}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 border border-red-200">
+                                <i class="fas fa-exclamation-triangle text-red-600 text-xs"></i>
+                                <span class="text-sm font-bold text-red-800">{{ stats.certs_fallidos }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-tasks text-slate-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 2: Gráficos de Actividad -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Gráfico: Correos Enviados -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-100 p-5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-paper-plane text-indigo-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 text-sm">Historial de Envíos</h3>
+                            <p class="text-xs text-slate-500">Últimos 7 días</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <div class="h-64 relative">
+                        <canvas id="emailsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico: Certificados Generados -->
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <div class="border-b border-slate-100 p-5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-certificate text-green-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 text-sm">Producción de Certificados</h3>
+                            <p class="text-xs text-slate-500">Últimos 7 días</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <div class="h-64 relative">
+                        <canvas id="certsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: Eventos Recientes -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div class="border-b border-slate-100 p-5 flex justify-between items-center">
+                <div>
+                    <h3 class="font-semibold text-slate-800 text-sm">Eventos Recientes</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Actividad más reciente del sistema</p>
+                </div>
+                <a href="{% url 'certificado:lista' %}" class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                    Ver todos
+                    <i class="fas fa-arrow-right text-[10px]"></i>
+                </a>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Nombre Evento</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha</th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for evento in recent_eventos %}
+                        <tr class="hover:bg-slate-50/70 transition-colors duration-150">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-slate-800 truncate max-w-md" title="{{ evento.nombre_evento }}">
+                                    {{ evento.nombre_evento }}
+                                </div>
+                                <div class="text-xs text-slate-500 mt-0.5">
+                                    <i class="fas fa-tag mr-1 text-[10px]"></i>{{ evento.tipo.nombre }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-600 text-sm">
+                                {{ evento.created_at|date:"d/m/Y" }}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                {% if evento.procesamiento_lote %}
+                                    {% if evento.procesamiento_lote.estado == 'completed' %}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                                            <i class="fas fa-check-circle text-[10px]"></i>
+                                            Completado
+                                        </span>
+                                    {% elif evento.procesamiento_lote.estado == 'processing' %}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                            <i class="fas fa-spinner fa-spin text-[10px]"></i>
+                                            Procesando
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                            {{ evento.procesamiento_lote.get_estado_display }}
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                        <i class="fas fa-circle text-[8px]"></i>
+                                        Sin procesar
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <a href="{% url 'certificado:evento_detail' evento.id %}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150">
+                                    <i class="fas fa-arrow-right text-sm"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-inbox text-slate-400 text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-slate-500 text-sm mb-2">No hay eventos recientes</p>
+                                        <a href="{% url 'certificado:crear' %}" 
+                                           class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium text-sm hover:underline">
+                                            <i class="fas fa-plus-circle"></i>
+                                            Crear primer evento
+                                        </a>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<!-- Datos para gráficos (JSON seguro) -->
+{{ chart_data|json_script:"chart-data-source" }}
+
+<!-- Lógica del Dashboard -->
+<script src="{% static 'js/core/dashboard.js' %}"></script>
 {% endblock %}

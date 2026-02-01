@@ -9,8 +9,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
 from apps.core.forms.base_form import CoreBaseModelForm
-from ..models import PlantillaBase, VariantePlantilla, Direccion
-
+from ..models import PlantillaBase, VariantePlantilla
 
 class PlantillaBaseForm(CoreBaseModelForm):
     """
@@ -55,6 +54,15 @@ class PlantillaBaseForm(CoreBaseModelForm):
             'es_activa': 'Solo puede haber una plantilla activa por dirección'
         }
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Si ya existe una instancia (edición) y tiene archivo, el campo no es obligatorio
+        if self.instance.pk and self.instance.archivo:
+            self.fields['archivo'].required = False
+            # Eliminar atributo required del widget si existe
+            if 'required' in self.fields['archivo'].widget.attrs:
+                del self.fields['archivo'].widget.attrs['required']
+
     def clean_archivo(self):
         """Validar que el archivo sea .docx y no exceda 10MB"""
         archivo = self.cleaned_data.get('archivo')
@@ -114,6 +122,15 @@ class VariantePlantillaForm(CoreBaseModelForm):
             'activo': 'Activa'
         }
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Si ya existe una instancia (edición) y tiene archivo, el campo no es obligatorio
+        if self.instance.pk and self.instance.archivo:
+            self.fields['archivo'].required = False
+            # Eliminar atributo required del widget si existe
+            if 'required' in self.fields['archivo'].widget.attrs:
+                del self.fields['archivo'].widget.attrs['required']
+
     def clean_archivo(self):
         """Validar que el archivo sea .docx y no exceda 10MB"""
         archivo = self.cleaned_data.get('archivo')

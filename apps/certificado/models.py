@@ -580,8 +580,6 @@ class Certificado(models.Model):
         ('sent', 'Enviado'),
     ]
 
-
-    
     # Relaciones
     evento = models.ForeignKey(
         Evento,
@@ -624,7 +622,7 @@ class Certificado(models.Model):
         default=uuid.uuid4, 
         editable=False, 
         unique=True,
-        null=True, # Permitir nulos temporalmente para migración
+        null=True,
         blank=True,
         verbose_name='UUID de Validación'
     )
@@ -667,6 +665,43 @@ class Certificado(models.Model):
             models.Index(fields=['estudiante']),
             models.Index(fields=['estado']),
         ]
+
+    def delete(self, *args, **kwargs):
+        """
+        Elimina el registro y los archivos físicos asociados (PDF/DOCX).
+        Override seguro para mantener limpio el almacenamiento.
+        """
+        # Rutas a eliminar
+        paths_to_remove = []
+        try:
+            if self.archivo_pdf:
+                paths_to_remove.append(self.archivo_pdf.path)
+            if self.archivo_docx:
+                paths_to_remove.append(self.archivo_docx.path)
+        except Exception:
+            pass # Si falla obtener path (ej: storage S3), ignorar
+
+        # Eliminar registro DB primero (si falla, no borramos archivos)
+        super().delete(*args, **kwargs)
+
+        # Eliminar archivos físicos y limpiar directorios
+        dirs_to_clean = set()
+        for path in paths_to_remove:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                    # Añadir directorio padre a la lista de limpieza
+                    dirs_to_clean.add(os.path.dirname(path))
+            except Exception as e:
+                # Log error pero no romper flujo
+                pass
+        
+        # Intentar eliminar directorios vacíos (ej: carpeta del estudiante)
+        for dirty_dir in dirs_to_clean:
+            try:
+                os.rmdir(dirty_dir) # Solo elimina si está vacío
+            except OSError:
+                pass # No está vacío o error de permisos
 
     def __str__(self):
         return f"Certificado de {self.estudiante.nombres_completos} - {self.get_estado_display()}"

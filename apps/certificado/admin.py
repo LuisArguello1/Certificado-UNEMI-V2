@@ -6,6 +6,7 @@ Registra todos los modelos con interfaces mejoradas y acciones personalizadas.
 
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.db.models import Count
 from .models import (
@@ -15,7 +16,10 @@ from .models import (
     Evento,
     Estudiante,
     Certificado,
-    ProcesamientoLote
+    ProcesamientoLote,
+    Modalidad,
+    Tipo,
+    TipoEvento
 )
 
 
@@ -47,6 +51,36 @@ class DireccionAdmin(admin.ModelAdmin):
         """Número de plantillas base asociadas"""
         return obj.plantillas_base.count()
     num_plantillas.short_description = 'Plantillas'
+
+
+@admin.register(Modalidad)
+class ModalidadAdmin(admin.ModelAdmin):
+    """Admin para el catálogo de Modalidades."""
+    list_display = ['codigo', 'nombre', 'activo', 'created_at']
+    list_filter = ['activo', 'created_at']
+    search_fields = ['codigo', 'nombre']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['nombre']
+
+
+@admin.register(Tipo)
+class TipoAdmin(admin.ModelAdmin):
+    """Admin para el catálogo de Tipos (Generales)."""
+    list_display = ['codigo', 'nombre', 'activo', 'created_at']
+    list_filter = ['activo', 'created_at']
+    search_fields = ['codigo', 'nombre']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['nombre']
+
+
+@admin.register(TipoEvento)
+class TipoEventoAdmin(admin.ModelAdmin):
+    """Admin para el catálogo de Tipos de Evento (Específicos)."""
+    list_display = ['codigo', 'nombre', 'activo', 'created_at']
+    list_filter = ['activo', 'created_at']
+    search_fields = ['codigo', 'nombre']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['nombre']
 
 
 @admin.register(PlantillaBase)
@@ -337,7 +371,7 @@ class CertificadoAdmin(admin.ModelAdmin):
                 '<a href="{}" target="_blank">📕 PDF</a>',
                 obj.archivo_pdf.url
             ))
-        return format_html(' '.join(links)) if links else '-'
+        return mark_safe(' '.join(links)) if links else '-'
     download_links.short_description = 'Descargar'
     
     def error_mensaje_display(self, obj):

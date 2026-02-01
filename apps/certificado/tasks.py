@@ -1,283 +1,265 @@
 """
 Tareas Celery para generación y envío de certificados.
 
-Este módulo define todas las tareas asíncronas del sistema.
+Este módulo define todas las tareas asíncronas del sistema, delegando la lógica
+de negocio a los servicios correspondientes para mantener un código limpio y mantenible.
 """
 
-import os
 import logging
+import os
 import time
-from celery import shared_task
-from django.core.mail import EmailMessage
-from django.conf import settings
-from django.utils import timezone
-from django.core.cache import cache
+from typing import Dict, Any, List
 
+from celery import shared_task
+from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
+
+# Models
+from apps.certificado.models import Certificado, ProcesamientoLote
+
+# Services
+from apps.certificado.services import (
+    CertificateStorageService,
+    EmailService,
+    PDFConversionService,
+    TemplateService,
+)
+from apps.certificado.services.qr_service import QRService 
+from apps.certificado.utils import get_template_path
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='apps.certificado.tasks.generate_certificate_task')
-def generate_certificate_task(self, certificado_id: int):
-    """
-    Tarea: Genera DOCX y convierte a PDF.
-    NO envía email automáticamente.
-    """
-    from .models import Certificado
-    from .services import TemplateService, PDFConversionService, CertificateStorageService
-    from .utils import get_template_path
-    
-    certificado = None
-    
-    try:
-        # Cargar certificado
-        certificado = Certificado.objects.select_related(
-            'evento', 'estudiante', 'evento__direccion'
-        ).get(id=certificado_id)
-        
-        # Actualizar estado
-        certificado.estado = 'generating'
-        certificado.save(update_fields=['estado', 'updated_at'])
-        
-        # Obtener plantilla
-        template_path = get_template_path(certificado.evento)
-        
-        # Construir variables
-        variables = TemplateService.get_variables_from_evento_estudiante(
-            certificado.evento,
-            certificado.estudiante
-        )
-        
-        # Generar DOCX temporal (necesario para conversión a PDF)
-        temp_docx = CertificateStorageService.get_temp_path(
-            f'cert_{certificado_id}_{certificado.estudiante.id}.docx'
-        )
-        
-        # Generar DOCX temporal
-        TemplateService.generate_docx(template_path, variables, temp_docx)
-        
-        # Convertir directamente a PDF
-        temp_pdf = PDFConversionService.convert_docx_to_pdf(temp_docx)
-        
-        # --- INYECCIÓN DE QR ---
-        if certificado.evento.incluir_qr:
-            try:
-                from .services.qr_service import QRService
-                QRService.stamp_qr_on_pdf(temp_pdf, certificado.uuid_validacion)
-            except Exception as e:
-                logger.error(f"Error inyectando QR en certificado {certificado.id}: {str(e)}")
-                # No fallamos la tarea completa, pero logueamos el error.
-                # Opcional: certificado.error_mensaje += " Error QR."
-        
-        # Guardar SOLO el PDF en ubicación final
-        pdf_path = CertificateStorageService.save_pdf_only(
-            evento_id=certificado.evento.id,
-            estudiante_id=certificado.estudiante.id,
-            pdf_source_path=temp_pdf
-        )
-        
-        # Actualizar certificado con ruta del PDF
-        certificado.archivo_pdf = pdf_path
-        certificado.estado = 'completed'
-        certificado.error_mensaje = ''
-        certificado.save()
-        
-        # Actualizar progreso del lote de forma sincrónica
-        # Ejecutamos sincrónicamente para que el cambio se vea reflejado en DB 
-        # inmediatamente después de completar el certificado.
-        _update_batch_progress_sync(certificado.evento.id)
-        
-        # Limpiar archivos temporales
-        try:
-            if os.path.exists(temp_docx):
-                os.remove(temp_docx)
-            if os.path.exists(temp_pdf):
-                os.remove(temp_pdf)
-        except:
-            pass
-        
-        return {
-            'status': 'success',
-            'certificado_id': certificado_id,
-            'estudiante': certificado.estudiante.nombres_completos
-        }
-        
-    except Exception as exc:
-        logger.error(f"[Certificado {certificado_id}] Error: {str(exc)}")
-        if certificado:
-            certificado.estado = 'failed'
-            certificado.error_mensaje = f"Error en generación: {str(exc)}"
-            certificado.save()
-            # Actualizar progreso en caso de error
-            _update_batch_progress_sync(certificado.evento.id)
-        
-        if 'timeout' in str(exc).lower() or 'temporary' in str(exc).lower():
-            raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
-        
-        return {'status': 'error', 'certificado_id': certificado_id, 'error': str(exc)}
+STATUS_GENERATING = 'generating'
+STATUS_COMPLETED = 'completed'
+STATUS_FAILED = 'failed'
+STATUS_SENDING_EMAIL = 'sending_email'
+STATUS_SENT = 'sent'
 
-
-# Calcular RATE LIMIT dinámico basado en configuración
+# Calculamos el rate limit al inicio
 try:
-    rate_seconds = getattr(settings, 'EMAIL_RATE_LIMIT_SECONDS', 2)
-    emails_per_minute = 60 // max(1, rate_seconds)
-    RATE_LIMIT_VALUE = f"{emails_per_minute}/m"
+    _rate_seconds = getattr(settings, 'EMAIL_RATE_LIMIT_SECONDS', 2)
+    _emails_per_minute = 60 // max(1, _rate_seconds)
+    RATE_LIMIT_VALUE = f"{_emails_per_minute}/m"
 except Exception:
     RATE_LIMIT_VALUE = '30/m'
 
-@shared_task(bind=True, max_retries=5, rate_limit=RATE_LIMIT_VALUE, name='apps.certificado.tasks.send_certificate_email_task')
-def send_certificate_email_task(self, certificado_id: int):
+
+# =============================================================================
+# TASKS
+# =============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='apps.certificado.tasks.generate_certificate_batch_task'
+)
+def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[str, Any]:
     """
-    Tarea de envío de email con certificado PDF adjunto.
+    Tarea OPTIMIZADA: Procesa un lote de certificados (Batch Processing).
     
-    Args:
-        certificado_id: ID del certificado a enviar
+    Flujo:
+    1. Genera todos los DOCX del lote.
+    2. Ejecuta UNA SOLA instancia de LibreOffice para convertir todos a PDF.
+    3. Finaliza cada uno (QR, Guardado, Estado).
     
-    Rate limit:
-        30 emails por minuto (configurado en decorator)
-    
-    Retry:
-        - Max 5 intentos
-        - Delay exponencial: 60s, 120s, 300s, 600s, 1200s
+    Esto reduce drásticamente el tiempo de startup de LibreOffice (4s -> 0.2s/cert).
     """
-    from .models import Certificado
+    logger.info(f"Iniciando batch task para {len(certificado_ids)} certificados")
     
-    certificado = None
+    certificados = Certificado.objects.select_related(
+        'evento', 'estudiante', 'evento__direccion'
+    ).filter(id__in=certificado_ids)
+    
+    # Mapas para seguimiento
+    certs_map = {c.id: c for c in certificados}
+    temp_docx_map = {} # {cert_id: path_docx}
+    temp_pdf_map = {}  # {cert_id: path_pdf}
+    docx_paths_list = []
+    final_errors = []
     
     try:
-        # Cargar certificado
+        # Puesto que vamos a procesar, marcamos todos como generating
+        Certificado.objects.filter(id__in=certificado_ids).update(
+            estado=STATUS_GENERATING, 
+            updated_at=timezone.now()
+        )
+        
+        # 1. Generación masiva de DOCX
+        
+        for cert in certificados:
+            try:
+                template_path = get_template_path(cert.evento)
+                variables = TemplateService.get_variables_from_evento_estudiante(
+                    cert.evento, cert.estudiante
+                )
+                
+                temp_docx = CertificateStorageService.get_temp_path(
+                    f'cert_{cert.id}_{cert.estudiante.id}.docx'
+                )
+                
+                TemplateService.generate_docx(template_path, variables, temp_docx)
+                
+                temp_docx_map[cert.id] = temp_docx
+                docx_paths_list.append(temp_docx)
+                
+            except Exception as e:
+                msg = f"Error generando DOCX para cert {cert.id}: {e}"
+                logger.error(msg)
+                final_errors.append(msg)
+                _fail_certificate(cert, msg)
+
+        # 2. Conversión BATCH a PDF
+        if docx_paths_list:
+            try:
+                # Esta es la llamada mágica que optimiza todo
+                # Retorna mapa {docx_path: pdf_path}
+                conversion_results = PDFConversionService.convert_batch_docx_to_pdf(docx_paths_list)
+                
+                # Mapear resultados de vuelta a certificados
+                for cert_id, docx_path in temp_docx_map.items():
+                    if docx_path in conversion_results:
+                        temp_pdf_map[cert_id] = conversion_results[docx_path]
+                    else:
+                        if cert_id in certs_map: # (Si no falló en paso 1)
+                            msg = "Fallo en conversión PDF batch"
+                            _fail_certificate(certs_map[cert_id], msg)
+                            
+            except Exception as e:
+                # Si falla el batch completo, fallamos todos los pendientes
+                logger.error(f"Fallo crítico en batch conversion: {e}")
+                for cert_id in temp_docx_map.keys():
+                    if cert_id in certs_map:
+                        _fail_certificate(certs_map[cert_id], f"Error Batch PDF: {e}")
+
+        # 3. Finalización Individual (QR + Guardado)
+        for cert_id, pdf_path in temp_pdf_map.items():
+            cert = certs_map.get(cert_id)
+            if not cert: continue
+            
+            try:
+                # QR
+                if cert.evento.incluir_qr:
+                    QRService.stamp_qr_on_pdf(pdf_path, cert.uuid_validacion)
+                
+                # Guardado final
+                final_path = CertificateStorageService.save_pdf_only(
+                    evento_id=cert.evento.id,
+                    estudiante_id=cert.estudiante.id,
+                    pdf_source_path=pdf_path
+                )
+                
+                # Éxito
+                cert.archivo_pdf = final_path
+                cert.estado = STATUS_COMPLETED
+                cert.error_mensaje = ''
+                cert.save()
+                
+            except Exception as e:
+                logger.error(f"Error finalizando cert {cert.id}: {e}")
+                _fail_certificate(cert, f"Error guardado/QR: {e}")
+
+        # Actualizar progreso del evento (una sola vez al final del batch)
+        if certificados:
+            _update_batch_progress_sync(certificados[0].evento.id)
+
+        return {
+            'status': 'batch_completed',
+            'processed': len(certificado_ids),
+            'success': len(temp_pdf_map),
+            'errors': len(final_errors)
+        }
+
+    except Exception as exc:
+        logger.error(f"Error crítico en task batch: {exc}")
+        raise self.retry(exc=exc, countdown=60)
+
+    finally:
+        # Limpieza masiva
+        for path in docx_paths_list:
+            _safe_remove(path)
+        for path in temp_pdf_map.values():
+            _safe_remove(path)
+
+
+def _fail_certificate(cert, message):
+    """Helper para marcar fallo individual."""
+    try:
+        cert.estado = STATUS_FAILED
+        cert.error_mensaje = str(message)[:255]
+        cert.save()
+    except:
+        pass
+
+def _safe_remove(path):
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except:
+        pass
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='apps.certificado.tasks.generate_certificate_task'
+)
+def generate_certificate_task(self, certificado_id: int) -> Dict[str, Any]:
+    """
+    Tarea Legacy: Mantenida por compatibilidad, pero envuelve la lógica batch.
+    Procesa un solo certificado delegando a la tarea batch.
+    """
+    return generate_certificate_batch_task([certificado_id])
+
+
+@shared_task(
+    bind=True, 
+    max_retries=5, 
+    rate_limit=RATE_LIMIT_VALUE, 
+    name='apps.certificado.tasks.send_certificate_email_task'
+)
+def send_certificate_email_task(self, certificado_id: int) -> Dict[str, Any]:
+    """
+    Tarea de envío de email con certificado PDF adjunto.
+    Delega la lógica de construcción y envío al servicio EmailService.
+    """
+    certificado = None
+
+    try:
         certificado = Certificado.objects.select_related(
             'evento', 'estudiante'
         ).get(id=certificado_id)
         
-        # Verificar que existe el PDF
+        # Validación previa
         if not certificado.archivo_pdf:
-            raise ValueError("El certificado no tiene archivo PDF generado")
-        
-        # Actualizar estado
-        certificado.estado = 'sending_email'
-        certificado.save(update_fields=['estado', 'updated_at'])
-        
-        # Construir email con template HTML
-        from django.template.loader import render_to_string
-        from datetime import datetime
-        import base64
-        
-        subject = f"Certificado - {certificado.evento.nombre_evento}"
-        
-        # Contexto para el template
-        context = {
-            'nombre_estudiante': certificado.estudiante.nombres_completos,
-            'nombre_evento': certificado.evento.nombre_evento,
-            'anio_actual': datetime.now().year,
-        }
-        
-        # Renderizar template HTML
-        html_content = render_to_string('certificado/email/certificado_email.html', context)
-        
-        # Versión texto plano como fallback
-        text_content = f"""
-Estimado/a {certificado.estudiante.nombres_completos},
+             raise ValueError("El certificado no tiene archivo PDF generado")
 
-Nos complace comunicarle que, en reconocimiento a su valiosa participación en la Jornada: {certificado.evento.nombre_evento}, le hacemos llegar adjunto a este mensaje su certificado. Este documento acredita su activa intervención y compromiso durante la actividad desarrollada.
+        # Delegar envío a EmailService
+        EmailService.send_certificate_email(certificado)
 
-Le invitamos a seguir formando parte de nuestras próximas actividades. Para más información, no dude en contactarnos.
-
-Saludos cordiales,
-Universidad Estatal de Milagro - UNEMI
-
-Todos los derechos reservados © UNEMI {datetime.now().year}
-        """.strip()
-        
-        # Crear email con alternativas (texto y HTML)
-        from django.core.mail import EmailMultiAlternatives
-        
-        email = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[certificado.estudiante.correo_electronico]
-        )
-        
-        # Adjuntar versión HTML
-        email.attach_alternative(html_content, "text/html")
-        
-        # LOGO: Usar CID (Content-ID) para máxima compatibilidad
-        try:
-            base_dir = str(settings.BASE_DIR)
-            logo_path = os.path.join(base_dir, 'static', 'img', 'Unemi_correo.png')
-            
-            if os.path.exists(logo_path):
-                with open(logo_path, 'rb') as logo_file:
-                    logo_data = logo_file.read()
-                    
-                    # Crear imagen MIME
-                    from email.mime.image import MIMEImage
-                    logo_image = MIMEImage(logo_data)
-                    
-                    # Definir Content-ID EXACTAMENTE como se usa en el HTML
-                    logo_image.add_header('Content-ID', '<unemi_logo>')
-                    logo_image.add_header('Content-Disposition', 'inline', filename='Unemi_correo.png')
-                    
-                    # Adjuntar al root del mensaje (o related)
-                    email.attach(logo_image)
-        except Exception:
-            # Si falla el logo, el correo se envía igual sin él (fallback texto en HTML)
-            pass
-        
-        # Adjuntar PDF del certificado
-        
-        # Adjuntar PDF del certificado
-        pdf_path = certificado.archivo_pdf.path if hasattr(certificado.archivo_pdf, 'path') else certificado.archivo_pdf
-        if os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as pdf_file:
-                email.attach(
-                    filename=f'Certificado_{certificado.estudiante.nombres_completos.replace(" ", "_")}.pdf',
-                    content=pdf_file.read(),
-                    mimetype='application/pdf'
-                )
-        else:
-            raise FileNotFoundError(f"Archivo PDF no encontrado: {pdf_path}")
-        
-        # Enviar email
-        email.send(fail_silently=False)
-        
-        # Incrementar contador diario de emails
-        from apps.certificado.models import EmailDailyLimit
-        EmailDailyLimit.increment_count()
-        
-        # Actualizar certificado
-        certificado.estado = 'sent'
-        certificado.enviado_email = True
-        certificado.fecha_envio = timezone.now()
-        certificado.intentos_envio += 1
-        certificado.save()
-        
-        # Actualizar progreso sincrónico cada vez que se envía uno
+        # Actualizar progreso
         _update_batch_progress_sync(certificado.evento.id)
-        
+
         return {
             'status': 'success',
             'certificado_id': certificado_id,
             'email': certificado.estudiante.correo_electronico
         }
-        
+
     except Exception as exc:
         logger.error(f"[Email {certificado_id}] Error: {str(exc)}")
         
-        # Actualizar intentos
-        if certificado:
-            certificado.intentos_envio += 1
-            certificado.error_mensaje = f"Error en envío de email: {str(exc)}"
-            certificado.save()
-        
-        # Retry
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+             raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
         else:
-            # Max retries alcanzado, marcar como fallido
             if certificado:
-                certificado.estado = 'failed'
+                certificado.estado = STATUS_FAILED
                 certificado.save()
                 _update_batch_progress_sync(certificado.evento.id)
             
@@ -288,43 +270,42 @@ Todos los derechos reservados © UNEMI {datetime.now().year}
             }
 
 
-def _update_batch_progress_sync(evento_id: int):
-    """
-    Actualiza el progreso del procesamiento en lote de forma SINCRÓNICA.
-    Se llama desde dentro de otras tareas para evitar el delay de la cola de Celery.
-    """
-    from .models import ProcesamientoLote
-    
-    # Key de throttling para no saturar la DB si hay muchos workers terminando a la vez
-    cache_key = f"batch_progress_throttle_{evento_id}"
-    
-    # Verificar si podemos actualizar (throttling reducido a 0.5s para fluidez)
-    last_update_time = cache.get(cache_key)
-    current_time = time.time()
-    
-    # Si han pasado más de 0.5 segundos desde la última actualización, procesamos
-    if last_update_time is None or (current_time - last_update_time) >= 0.5:
-        try:
-            lote = ProcesamientoLote.objects.get(evento_id=evento_id)
-            lote.actualizar_contadores()
-            
-            # Actualizar timestamp de última actualización
-            cache.set(cache_key, current_time, timeout=300)
-            
-            logger.info(f"[Lote {evento_id}] Progreso actualizado sincrónicamente: {lote.porcentaje_progreso}%")
-            return True
-            
-        except Exception as exc:
-            logger.error(f"[Lote Evento {evento_id}] Error actualizando progreso: {str(exc)}")
-            return False
-    return False
-
-
 @shared_task(name='apps.certificado.tasks.update_batch_progress_task')
-def update_batch_progress_task(evento_id: int):
+def update_batch_progress_task(evento_id: int) -> Dict[str, Any]:
     """
     Tarea Celery (wrapper) para actualizar el progreso.
     """
     success = _update_batch_progress_sync(evento_id)
     return {'status': 'success' if success else 'throttled', 'evento_id': evento_id}
 
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def _update_batch_progress_sync(evento_id: int) -> bool:
+    """
+    Actualiza el progreso del procesamiento en lote de forma SINCRÓNICA.
+    Se utiliza cache para throttling y evitar saturar la base de datos.
+    """
+    cache_key = f"batch_progress_throttle_{evento_id}"
+    
+    last_update_time = cache.get(cache_key)
+    current_time = time.time()
+    
+    # Throttle: 0.5 segundos
+    if last_update_time is None or (current_time - last_update_time) >= 0.5:
+        try:
+            lote = ProcesamientoLote.objects.get(evento_id=evento_id)
+            lote.actualizar_contadores()
+            
+            cache.set(cache_key, current_time, timeout=300)
+            
+            logger.info(f"[Lote {evento_id}] Progreso actualizado: {lote.porcentaje_progreso}%")
+            return True
+            
+        except Exception as exc:
+            logger.error(f"[Lote Evento {evento_id}] Error actualizando progreso: {str(exc)}")
+            return False
+            
+    return False

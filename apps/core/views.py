@@ -7,58 +7,40 @@ Siguiendo arquitectura de views delgadas:
 - Contexto claro y bien estructurado
 """
 from django.views.generic import TemplateView
-from django.urls import reverse
 from django.contrib.auth.mixins import LoginRequiredMixin
+from apps.core.services.dashboard_service import DashboardService
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     """
     Vista principal del dashboard.
-    
-    Muestra métricas del sistema, archivos recientes y actividad.
-    View delgada: obtiene datos del service y renderiza.
+    Refactorizada para usar DashboardService (Thin View).
     """
     template_name = 'core/dashboard.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
         
-        # Menu items para el sidebar (Usando Service)
-        from apps.core.services.menu_service import MenuService
-        context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        
-        # Breadcrumbs
-        context['breadcrumbs'] = [
-            {'name': 'Dashboard'}
-        ]
-        
-        # Título de la página
+        # 1. Breadcrumbs y UI
+        context['breadcrumbs'] = [{'name': 'Dashboard'}]
         context['page_title'] = 'Dashboard'
         
-        # Imports de modelos
-
-        from apps.certificado.models import EmailDailyLimit
-        from django.db.models import Count, Q, Sum
-        from datetime import datetime, timedelta
-
-        hoy = datetime.now().date()
-        inicio_semana = hoy - timedelta(days=hoy.weekday())
-        inicio_mes = hoy.replace(day=1)
-
-        # ===== LÍMITE DIARIO DE CORREOS =====
-        from django.conf import settings
-        daily_limit = getattr(settings, 'EMAIL_DAILY_LIMIT', 400)
+        # 2. Obtener datos del servicio
+        # 2. Obtener datos del servicio (Globales)
+        stats = DashboardService.get_general_stats()
+        recent_activity = DashboardService.get_recent_activity()
+        email_status = DashboardService.get_email_limit_status()
+        chart_data = DashboardService.get_chart_data()
         
-        limit_record, _ = EmailDailyLimit.objects.get_or_create(date=hoy)
-        correos_enviados_hoy = limit_record.count
+        # 3. Inyectar en contexto
+        context['stats'] = stats
+        context['recent_eventos'] = recent_activity
+        context['chart_data'] = chart_data
         
-        context['email_daily_limit'] = daily_limit
-        context['email_sent_today'] = correos_enviados_hoy
-        context['email_remaining_today'] = max(0, daily_limit - correos_enviados_hoy)
-        
-        if daily_limit > 0:
-            context['email_daily_percent'] = round((correos_enviados_hoy / daily_limit) * 100, 1)
-        else:
-            context['email_daily_percent'] = 0
+        # Mapeo de datos para el bloque de email (compatibilidad con template)
+        context['email_daily_limit'] = email_status['limit']
+        context['email_sent_today'] = email_status['sent']
+        context['email_remaining_today'] = email_status['remaining']
+        context['email_daily_percent'] = email_status['percent']
         
         return context
-

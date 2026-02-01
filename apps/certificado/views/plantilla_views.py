@@ -2,7 +2,11 @@
 Vistas para gestión de plantillas de certificados.
 
 Este módulo contiene todas las vistas CRUD para PlantillaBase y VariantePlantilla.
+Soporta la carga de archivos DOCX y la gestión de variantes mediante formsets.
 """
+
+import logging
+from typing import Any, Dict
 
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
@@ -10,14 +14,15 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.shortcuts import redirect
-from ..models import PlantillaBase, VariantePlantilla
-from ..forms.plantilla_forms import PlantillaBaseForm, VariantePlantillaFormSet
-import logging
+
+from apps.certificado.models import PlantillaBase
+from apps.certificado.forms.plantilla_forms import PlantillaBaseForm, VariantePlantillaFormSet
+from apps.certificado.views.catalogo_views import BaseCatalogoMixin
 
 logger = logging.getLogger(__name__)
 
 
-class PlantillaListView(LoginRequiredMixin, ListView):
+class PlantillaListView(LoginRequiredMixin, BaseCatalogoMixin, ListView):
     """
     Vista de listado de plantillas base con paginación.
     """
@@ -25,25 +30,19 @@ class PlantillaListView(LoginRequiredMixin, ListView):
     template_name = 'certificado/plantilla/plantilla_list.html'
     context_object_name = 'plantillas'
     paginate_by = 12
+    titulo = 'Plantillas de Certificados'
     
     def get_queryset(self):
         """Optimizar query con select_related y prefetch_related"""
         return PlantillaBase.objects.select_related('direccion').prefetch_related('variantes').order_by('-created_at')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        try:
-            from apps.core.services.menu_service import MenuService
-            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        except ImportError:
-            context['menu_items'] = []
-        
         context['breadcrumbs'] = [{'name': 'Plantillas de Certificados'}]
-        context['page_title'] = 'Plantillas de Certificados'
         return context
 
 
-class PlantillaDetailView(LoginRequiredMixin, DetailView):
+class PlantillaDetailView(LoginRequiredMixin, BaseCatalogoMixin, DetailView):
     """
     Vista de detalle de una plantilla base mostrando todas sus variantes.
     """
@@ -55,24 +54,18 @@ class PlantillaDetailView(LoginRequiredMixin, DetailView):
         """Optimizar query"""
         return PlantillaBase.objects.select_related('direccion').prefetch_related('variantes')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        try:
-            from apps.core.services.menu_service import MenuService
-            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        except ImportError:
-            context['menu_items'] = []
-        
+        context['page_title'] = f'Detalle: {self.object.nombre}'
         context['breadcrumbs'] = [
             {'name': 'Plantillas', 'url': reverse('certificado:plantilla_list')},
             {'name': self.object.nombre}
         ]
-        context['page_title'] = f'Detalle: {self.object.nombre}'
         context['variantes'] = self.object.variantes.filter(activo=True).order_by('orden', 'nombre')
         return context
 
 
-class PlantillaCreateView(LoginRequiredMixin, CreateView):
+class PlantillaCreateView(LoginRequiredMixin, BaseCatalogoMixin, CreateView):
     """
     Vista para crear nueva plantilla base con variantes inline.
     """
@@ -80,20 +73,14 @@ class PlantillaCreateView(LoginRequiredMixin, CreateView):
     form_class = PlantillaBaseForm
     template_name = 'certificado/plantilla/plantilla_form.html'
     success_url = reverse_lazy('certificado:plantilla_list')
+    titulo = 'Crear Nueva Plantilla'
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        try:
-            from apps.core.services.menu_service import MenuService
-            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        except ImportError:
-            context['menu_items'] = []
-        
         context['breadcrumbs'] = [
             {'name': 'Plantillas', 'url': reverse('certificado:plantilla_list')},
             {'name': 'Crear Plantilla'}
         ]
-        context['page_title'] = 'Crear Nueva Plantilla'
         
         # Formset de variantes
         if self.request.POST:
@@ -139,12 +126,11 @@ class PlantillaCreateView(LoginRequiredMixin, CreateView):
         return redirect(self.success_url)
     
     def form_invalid(self, form):
-        """Mostrar errores en mensajes"""
         messages.error(self.request, 'Por favor corrija los errores en el formulario.')
         return super().form_invalid(form)
 
 
-class PlantillaUpdateView(LoginRequiredMixin, UpdateView):
+class PlantillaUpdateView(LoginRequiredMixin, BaseCatalogoMixin, UpdateView):
     """
     Vista para editar plantilla base y sus variantes.
     """
@@ -153,19 +139,13 @@ class PlantillaUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'certificado/plantilla/plantilla_form.html'
     success_url = reverse_lazy('certificado:plantilla_list')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        try:
-            from apps.core.services.menu_service import MenuService
-            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        except ImportError:
-            context['menu_items'] = []
-        
+        context['page_title'] = f'Editar: {self.object.nombre}'
         context['breadcrumbs'] = [
             {'name': 'Plantillas', 'url': reverse('certificado:plantilla_list')},
             {'name': 'Editar Plantilla'}
         ]
-        context['page_title'] = f'Editar: {self.object.nombre}'
         
         # Formset de variantes
         if self.request.POST:
@@ -204,37 +184,29 @@ class PlantillaUpdateView(LoginRequiredMixin, UpdateView):
         return redirect(self.success_url)
     
     def form_invalid(self, form):
-        """Mostrar errores en mensajes"""
         messages.error(self.request, 'Por favor corrija los errores en el formulario.')
         return super().form_invalid(form)
 
 
-class PlantillaDeleteView(LoginRequiredMixin, DeleteView):
+class PlantillaDeleteView(LoginRequiredMixin, BaseCatalogoMixin, DeleteView):
     """
     Vista para eliminar plantilla base (y sus variantes en cascada).
     """
     model = PlantillaBase
     template_name = 'certificado/plantilla/plantilla_confirm_delete.html'
     success_url = reverse_lazy('certificado:plantilla_list')
+    titulo = 'Eliminar Plantilla'
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        try:
-            from apps.core.services.menu_service import MenuService
-            context['menu_items'] = MenuService.get_menu_items(self.request.path, self.request.user)
-        except ImportError:
-            context['menu_items'] = []
-        
         context['breadcrumbs'] = [
             {'name': 'Plantillas', 'url': reverse('certificado:plantilla_list')},
             {'name': 'Eliminar Plantilla'}
         ]
-        context['page_title'] = 'Eliminar Plantilla'
         context['num_variantes'] = self.object.variantes.count()
         return context
     
     def delete(self, request, *args, **kwargs):
-        """Override para mostrar mensaje de éxito"""
         plantilla_nombre = self.get_object().nombre
         response = super().delete(request, *args, **kwargs)
         messages.success(

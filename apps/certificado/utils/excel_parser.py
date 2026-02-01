@@ -64,6 +64,8 @@ class ExcelParser:
         """
         Normaliza texto para comparación: quita tildes, convierte a mayúsculas, quita espacios extras.
         """
+        if not text:
+            return ""
         import unicodedata
         # Quitar tildes
         text = ''.join(
@@ -72,6 +74,28 @@ class ExcelParser:
         )
         # Mayúsculas y quitar espacios extras
         return ' '.join(text.upper().split())
+    
+    @staticmethod
+    def sanitize_value(value):
+        """
+        Limpia caracteres invisibles y espacios extras.
+        """
+        if value is None:
+            return ""
+        
+        # Convertir a string
+        text = str(value)
+        
+        # Eliminar caracteres invisibles específicos (zero-width space, etc.)
+        # \u200b: Zero width space
+        # \ufeff: Byte order mark
+        # \u200c: Zero width non-joiner
+        # \u200d: Zero width joiner
+        invisible_chars = ['\u200b', '\ufeff', '\u200c', '\u200d']
+        for char in invisible_chars:
+            text = text.replace(char, '')
+            
+        return text.strip()
     
     def __init__(self, file_path_or_file):
         """
@@ -129,7 +153,9 @@ class ExcelParser:
     
     def _identify_columns(self):
         """
-        Identifica las columnas de nombres y correo en el header.
+        Identifica las columnas de nombres y correo buscando en las primeras filas.
+        
+        Scanea hasta 10 filas buscando los headers requeridos.
         
         Raises:
             ExcelParseError: Si no se encuentran las columnas requeridas
@@ -137,50 +163,62 @@ class ExcelParser:
         if not self.worksheet or self.worksheet.max_row < 1:
             raise ExcelParseError("El archivo Excel está vacío")
         
-        # Leer headers (primera fila)
-        headers = []
-        for cell in self.worksheet[1]:
-            value = str(cell.value).strip() if cell.value else ''
-            headers.append(value)
+        # Escanear primeras 10 filas o hasta el final
+        max_scan_rows = min(10, self.worksheet.max_row)
+        header_row_index = None
         
-        # Normalizar headers para comparación
-        normalized_headers = [self.normalize_text(h) for h in headers]
-        
-        # Buscar columna de nombres
-        for idx, norm_header in enumerate(normalized_headers):
-            for nombre_option in self.NOMBRES_HEADERS:
-                if self.normalize_text(nombre_option) in norm_header or norm_header in self.normalize_text(nombre_option):
-                    self.nombres_col_index = idx
-                    break
-            if self.nombres_col_index is not None:
+        for row_idx, row in enumerate(self.worksheet.iter_rows(min_row=1, max_row=max_scan_rows), start=1):
+            # Obtener valores normalizados de la fila
+            row_values = []
+            for cell in row:
+                value = self.sanitize_value(cell.value)
+                row_values.append(self.normalize_text(value))
+            
+            # Buscar si esta fila tiene AMBOS headers candidatos
+            has_nombre = any(any(n in h for n in [self.normalize_text(x) for x in self.NOMBRES_HEADERS]) for h in row_values)
+            has_correo = any(any(c in h for c in [self.normalize_text(x) for x in self.CORREO_HEADERS]) for h in row_values)
+            
+            if has_nombre and has_correo:
+                header_row_index = row_idx
+                logger.info(f"Headers encontrados en fila {row_idx}")
                 break
         
-        # Buscar columna de correo
+        if header_row_index is None:
+            raise ExcelParseError(
+                "No se encontraron los encabezados 'NOMBRES' y 'CORREO' en las primeras 10 filas. "
+                "Asegúrese de que el archivo tenga estas columnas."
+            )
+            
+        # Procesar la fila encontrada para obtener índices exactos
+        self.header_row = header_row_index
+        headers = []
+        # Leer fila de headers real
+        for row in self.worksheet.iter_rows(min_row=header_row_index, max_row=header_row_index):
+            headers = [self.sanitize_value(cell.value) for cell in row]
+            
+        normalized_headers = [self.normalize_text(h) for h in headers]
+        
+        # Buscar índice de Nombres
+        for idx, norm_header in enumerate(normalized_headers):
+            for nombre_option in self.NOMBRES_HEADERS:
+                if self.normalize_text(nombre_option) == norm_header or  self.normalize_text(nombre_option) in norm_header:
+                     self.nombres_col_index = idx
+                     break
+            if self.nombres_col_index is not None:
+                break
+                
+        # Buscar índice de Correo
         for idx, norm_header in enumerate(normalized_headers):
             for correo_option in self.CORREO_HEADERS:
-                if self.normalize_text(correo_option) in norm_header or norm_header in self.normalize_text(correo_option):
+                if self.normalize_text(correo_option) == norm_header or self.normalize_text(correo_option) in norm_header:
                     self.correo_col_index = idx
                     break
             if self.correo_col_index is not None:
                 break
         
-        # Validar que se encontraron ambas columnas
-        if self.nombres_col_index is None:
-            raise ExcelParseError(
-                f"No se encontró la columna de NOMBRES. "
-                f"Headers encontrados: {', '.join(headers)}. "
-                f"Use alguna de estas variantes: NOMBRES COMPLETOS, NOMBRE, ESTUDIANTE, PARTICIPANTE"
-            )
-        
-        if self.correo_col_index is None:
-            raise ExcelParseError(
-                f"No se encontró la columna de CORREO ELECTRONICO. "
-                f"Headers encontrados: {', '.join(headers)}. "
-                f"Use alguna de estas variantes: CORREO ELECTRONICO, CORREO, EMAIL, MAIL"
-            )
-        
-        logger.info(f"Columnas identificadas - Nombres: '{headers[self.nombres_col_index]}' (col {self.nombres_col_index}), "
-                   f"Correo: '{headers[self.correo_col_index]}' (col {self.correo_col_index})")
+        # Validación final de índices
+        if self.nombres_col_index is None or self.correo_col_index is None:
+             raise ExcelParseError("Error interno identificando columnas después de detectar headers.")
     
     def _extract_data(self) -> List[Dict[str, str]]:
         """
@@ -191,21 +229,24 @@ class ExcelParser:
         """
         estudiantes = []
         
-        # Iterar desde la fila 2 (después del header) hasta el final
-        for row_idx, row in enumerate(self.worksheet.iter_rows(min_row=2), start=2):
+        # Iterar desde la fila siguiente al header
+        start_row = self.header_row + 1
+        
+        for row_idx, row in enumerate(self.worksheet.iter_rows(min_row=start_row), start=start_row):
+            # Asegurar que la fila tenga suficientes celdas
+            if len(row) <= max(self.nombres_col_index, self.correo_col_index):
+                continue
+                
             nombres_cell = row[self.nombres_col_index]
             correo_cell = row[self.correo_col_index]
             
-            nombres = str(nombres_cell.value).strip() if nombres_cell.value else ''
-            correo = str(correo_cell.value).strip() if correo_cell.value else ''
+            nombres = self.sanitize_value(nombres_cell.value)
+            correo = self.sanitize_value(correo_cell.value)
             
             # Saltar filas completamente vacías
             if not nombres and not correo:
                 continue
-            
-            # NOTA: No validamos aquí si falta uno, lo dejamos pasar para que _validate_data 
-            # reporte todos los errores juntos.
-            
+
             estudiantes.append({
                 'nombres_completos': nombres,
                 'correo_electronico': correo,
@@ -228,9 +269,11 @@ class ExcelParser:
         correos_vistos = set()
         nombres_vistos = set()
         
-        # Regex para validar email estricto (no permite tildes ni caracteres especiales raros)
-        # Solo letras, números, ., _, - y @.
-        email_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*@[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        # Regex para validar email
+        # Permitimos '+' para alias y dominios de alto nivel largos
+        # Estructura: [usuario] @ [dominio] . [tld]
+        # usuario: alfanumérico, ., _, -, +
+        email_regex = re.compile(r'^[a-zA-Z0-9.+_-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
         
         for estudiante in estudiantes:
             row_num = estudiante['row_number']

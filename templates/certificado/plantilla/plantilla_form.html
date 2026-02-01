@@ -86,7 +86,7 @@
 
                 <!-- COLUMNA DERECHA: Archivo -->
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">{{ form.archivo.label }} *</label>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">{{ form.archivo.label }} {% if not object.archivo %}*{% endif %}</label>
                     <div id="drop-zone-base" class="relative group border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-gray-50 hover:border-indigo-400 transition-all cursor-pointer bg-white h-full min-h-[300px]">
                         
                         <!-- Initial State -->
@@ -240,96 +240,18 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/certificado/plantilla_form.js' %}"></script>
 <script>
-// Cargar direcciones para el modal
-document.addEventListener('DOMContentLoaded', function() {
-    const selectBtn = document.getElementById('selectDireccionBtn');
-    const modal = document.getElementById('direccionModal');
-    const closeBtn = document.getElementById('closeDireccionModal');
-    const direccionesGrid = document.getElementById('direccionesGrid');
-    const hiddenInput = document.getElementById('id_direccion');
-    const displayDiv = document.getElementById('selectedDireccionDisplay');
-
-    // Abrir modal
-    selectBtn.addEventListener('click', function() {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        cargarDirecciones();
-    });
-
-    // Cerrar modal
-    closeBtn.addEventListener('click', function() {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    });
-
-    // Cerrar al hacer click fuera
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-    });
-
-    // Cargar direcciones
-    function cargarDirecciones() {
-        // Por ahora usar valores del template, luego podemos hacer AJAX
-        const direcciones = [
-            {% for dir in form.direccion.field.queryset %}
-            {
-                id: {{ dir.pk }},
-                nombre: "{{ dir.nombre|escapejs }}",
-                codigo: "{{ dir.codigo|escapejs }}",
-                activo: {{ dir.activo|lower }}
-            }{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
-
-        direccionesGrid.innerHTML = `
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                ${direcciones.map(dir => `
-                    <button type="button" class="direccion-card text-left p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all ${!dir.activo ? 'opacity-50' : ''}" data-id="${dir.id}" data-nombre="${dir.nombre}" data-codigo="${dir.codigo}">
-                        <div class="flex items-start">
-                            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
-                                <i class="fas fa-folder text-indigo-600 text-xl"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="text-sm font-bold text-gray-900 truncate">${dir.nombre}</h3>
-                                <p class="text-xs text-gray-500 mt-0.5">Código: ${dir.codigo}</p>
-                                ${!dir.activo ? '<span class="inline-block mt-1 text-[9px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">INACTIVA</span>' : '<span class="inline-block mt-1 text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">ACTIVA</span>'}
-                            </div>
-                        </div>
-                    </button>
-                `).join('')}
-            </div>
-        `;
-
-        // Event listeners para cada card
-        document.querySelectorAll('.direccion-card').forEach(card => {
-            card.addEventListener('click', function() {
-                const id = this.dataset.id;
-                const nombre = this.dataset.nombre;
-                const codigo = this.dataset.codigo;
-
-                // Actualizar input hidden
-                hiddenInput.value = id;
-
-                // Actualizar display
-                displayDiv.innerHTML = `
-                    <i class="fas fa-folder text-indigo-600 mr-3 text-xl"></i>
-                    <div>
-                        <span class="block text-sm font-bold text-gray-900">${nombre}</span>
-                        <span class="text-xs text-gray-500">Código: ${codigo}</span>
-                    </div>
-                `;
-
-                // Cerrar modal
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            });
-        });
-    }
-});
+// Inyectar datos de direcciones para el modal selector
+window.DIRECCIONES_DATA = [
+    {% for dir in form.direccion.field.queryset %}
+    {
+        id: {{ dir.pk }},
+        nombre: "{{ dir.nombre|escapejs }}",
+        codigo: "{{ dir.codigo|escapejs }}",
+        activo: {{ dir.activo|lower }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
 </script>
+<script src="{% static 'js/certificado/plantilla_form.js' %}"></script>
 {% endblock %}

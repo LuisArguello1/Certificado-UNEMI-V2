@@ -1,151 +1,157 @@
 """
 Servicio de almacenamiento para archivos de certificados.
 
-Organiza y guarda archivos DOCX y PDF en estructura de directorios.
+Gestiona la organización física de archivos DOCX y PDF en el sistema de archivos,
+siguiendo la estructura jerárquica por evento y estudiante.
 """
 
 import os
 import shutil
 import logging
+import tempfile
+from typing import Tuple, Optional
 from django.conf import settings
-
 
 logger = logging.getLogger(__name__)
 
 
 class CertificateStorageService:
     """
-    Servicio para organizar y almacenar archivos de certificados.
+    Servicio para persistencia y organización de archivos generados.
     
-    Estructura de directorios:
-        media/certificados/{evento_id}/{estudiante_id}/
-            certificado.docx
-            certificado.pdf
+    Patrón de almacenamiento:
+        MEDIA_ROOT/certificados/{evento_id}/{estudiante_id}/{filename}
     """
     
     @staticmethod
     def get_certificate_directory(evento_id: int, estudiante_id: int) -> str:
         """
-        Obtiene la ruta del directorio para un certificado.
-        
+        Calcula la ruta absoluta del directorio de almacenamiento para un estudiante.
+
         Args:
-            evento_id: ID del evento
-            estudiante_id: ID del estudiante
-        
+            evento_id (int): ID del evento.
+            estudiante_id (int): ID del estudiante.
+
         Returns:
-            Ruta absoluta del directorio
+            str: Ruta absoluta al directorio destino.
         """
-        base_path = getattr(settings, 'CERTIFICADO_STORAGE_PATH', 
-                           os.path.join(settings.MEDIA_ROOT, 'certificados'))
-        cert_dir = os.path.join(base_path, str(evento_id), str(estudiante_id))
-        return cert_dir
+        base_path = getattr(settings, 'CERTIFICADO_STORAGE_PATH', None)
+        if not base_path:
+            base_path = os.path.join(settings.MEDIA_ROOT, 'certificados')
+            
+        return os.path.join(base_path, str(evento_id), str(estudiante_id))
     
     @staticmethod
-    def ensure_directory_exists(directory_path: str):
+    def ensure_directory_exists(directory_path: str) -> None:
         """
-        Asegura que existe un directorio, creándolo si es necesario.
+        Crea el directorio si no existe (idempotente).
         
         Args:
-            directory_path: Ruta del directorio
+            directory_path (str): Ruta absoluta.
         """
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path, exist_ok=True)
+        os.makedirs(directory_path, exist_ok=True)
     
-    @staticmethod
-    def save_certificate_files(evento_id: int, estudiante_id: int,
-                              docx_source_path: str, pdf_source_path: str) -> tuple:
+    @classmethod
+    def save_certificate_files(
+        cls, 
+        evento_id: int, 
+        estudiante_id: int,
+        docx_source_path: str, 
+        pdf_source_path: str
+    ) -> Tuple[str, str]:
         """
-        Mueve y organiza los archivos de certificado en la estructura correcta.
-        
+        Almacena el par de archivos (DOCX, PDF) en su ubicación final.
+
+        Copia los archivos desde su ubicación temporal a la estructura definitiva
+        y retorna las rutas relativas para guardar en la BD.
+
         Args:
-            evento_id: ID del evento
-            estudiante_id: ID del estudiante
-            docx_source_path: Ruta temporal del DOCX generado
-            pdf_source_path: Ruta temporal del PDF generado
-        
+            evento_id (int): ID del evento.
+            estudiante_id (int): ID del estudiante.
+            docx_source_path (str): Ruta absoluta del DOCX temporal.
+            pdf_source_path (str): Ruta absoluta del PDF temporal.
+
         Returns:
-            Tupla (docx_relative_path, pdf_relative_path) para guardar en base de datos
+            Tuple[str, str]: (docx_relative_path, pdf_relative_path) relativas a MEDIA_ROOT.
+
+        Raises:
+            FileNotFoundError: Si los archivos fuente no existen.
+            OSError: Si hay error de permisos o disco.
         """
         try:
-            # Obtener directorio destino
-            dest_dir = CertificateStorageService.get_certificate_directory(evento_id, estudiante_id)
-            CertificateStorageService.ensure_directory_exists(dest_dir)
+            dest_dir = cls.get_certificate_directory(evento_id, estudiante_id)
+            cls.ensure_directory_exists(dest_dir)
             
-            # Rutas de destino
+            # Definir destinos finales
             docx_dest = os.path.join(dest_dir, 'certificado.docx')
             pdf_dest = os.path.join(dest_dir, 'certificado.pdf')
             
-            # Copiar archivos (no mover, para mantener originales si son necesarios)
-            if os.path.exists(docx_source_path):
-                shutil.copy2(docx_source_path, docx_dest)
-            else:
-                logger.warning(f"DOCX source no encontrado: {docx_source_path}")
+            # Validar fuentes
+            if not os.path.exists(docx_source_path):
+                raise FileNotFoundError(f"Fuente DOCX no encontrada: {docx_source_path}")
             
-            if os.path.exists(pdf_source_path):
-                shutil.copy2(pdf_source_path, pdf_dest)
-            else:
-                logger.warning(f"PDF source no encontrado: {pdf_source_path}")
+            if not os.path.exists(pdf_source_path):
+                # Logueamos warning pero no fallamos críticamente en DOCX,
+                # Si falta PDF es crítico para el flujo.
+                raise FileNotFoundError(f"Fuente PDF no encontrada: {pdf_source_path}")
             
-            # Convertir a rutas relativas para la base de datos
-            media_root = settings.MEDIA_ROOT
-            docx_relative = os.path.relpath(docx_dest, media_root).replace('\\', '/')
-            pdf_relative = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
+            # Copiar archivos
+            shutil.copy2(docx_source_path, docx_dest)
+            shutil.copy2(pdf_source_path, pdf_dest)
             
-            return docx_relative, pdf_relative
+            # Calcular rutas relativas para Django FileField
+            media_root = str(settings.MEDIA_ROOT)
+            
+            # Relpath maneja correctamente los separadores de sistema
+            docx_rel = os.path.relpath(docx_dest, media_root)
+            pdf_rel = os.path.relpath(pdf_dest, media_root)
+            
+            # Normalizar a slash para BD (Django convention)
+            return (docx_rel.replace('\\', '/'), pdf_rel.replace('\\', '/'))
             
         except Exception as e:
-            logger.error(f"Error al guardar archivos de certificado: {str(e)}")
+            logger.error(f"Error guardando certificados para est {estudiante_id}: {e}")
             raise
 
-    @staticmethod
-    def save_pdf_only(evento_id: int, estudiante_id: int, pdf_source_path: str) -> str:
+    @classmethod
+    def save_pdf_only(
+        cls, 
+        evento_id: int, 
+        estudiante_id: int, 
+        pdf_source_path: str
+    ) -> str:
         """
-        Guarda solo el archivo PDF en la estructura correcta.
-        
+        Almacena solo el archivo PDF (útil para regeneraciones parciales).
+
         Args:
-            evento_id: ID del evento
-            estudiante_id: ID del estudiante
-            pdf_source_path: Ruta temporal del PDF generado
-        
+            evento_id (int): ID del evento.
+            estudiante_id (int): ID del estudiante.
+            pdf_source_path (str): Ruta temporal del PDF.
+
         Returns:
-            Ruta relativa del PDF para guardar en base de datos
+            str: Ruta relativa del PDF.
         """
         try:
-            # Obtener directorio destino
-            dest_dir = CertificateStorageService.get_certificate_directory(evento_id, estudiante_id)
-            CertificateStorageService.ensure_directory_exists(dest_dir)
+            dest_dir = cls.get_certificate_directory(evento_id, estudiante_id)
+            cls.ensure_directory_exists(dest_dir)
             
-            # Ruta de destino
             pdf_dest = os.path.join(dest_dir, 'certificado.pdf')
             
-            # Copiar archivo
-            if os.path.exists(pdf_source_path):
-                shutil.copy2(pdf_source_path, pdf_dest)
-            else:
-                logger.warning(f"PDF source no encontrado: {pdf_source_path}")
-                raise FileNotFoundError(f"PDF source no encontrado: {pdf_source_path}")
+            if not os.path.exists(pdf_source_path):
+                raise FileNotFoundError(f"Fuente PDF no encontrada: {pdf_source_path}")
             
-            # Convertir a ruta relativa para la base de datos
-            media_root = settings.MEDIA_ROOT
-            pdf_relative = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
+            shutil.copy2(pdf_source_path, pdf_dest)
             
-            return pdf_relative
+            media_root = str(settings.MEDIA_ROOT)
+            pdf_rel = os.path.relpath(pdf_dest, media_root)
+            
+            return pdf_rel.replace('\\', '/')
             
         except Exception as e:
-            logger.error(f"Error al guardar PDF: {str(e)}")
+            logger.error(f"Error guardando PDF para est {estudiante_id}: {e}")
             raise
     
     @staticmethod
     def get_temp_path(filename: str) -> str:
-        """
-        Obtiene una ruta temporal para un archivo.
-        
-        Args:
-            filename: Nombre del archivo
-        
-        Returns:
-            Ruta absoluta en directorio temporal
-        """
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        return os.path.join(temp_dir, filename)
+        """Genera una ruta absoluta segura en el directorio temporal del sistema."""
+        return os.path.join(tempfile.gettempdir(), filename)
