@@ -8,6 +8,7 @@ from django.views.generic import DetailView
 from django.shortcuts import get_object_or_404
 from django.db.models import Model
 from apps.certificado.models import Certificado
+from django.views.generic import DetailView
 
 class ValidacionCertificadoView(DetailView):
     """

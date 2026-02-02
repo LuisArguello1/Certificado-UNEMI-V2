@@ -208,7 +208,7 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         context['lote'] = ProcesamientoLote.objects.filter(evento=self.object).first()
         
         # Estadísticas basadas en certificados
-        certificados_qs = Certificado.objects.filter(evento=self.object)
+        certificados_qs = Certificado.objects.filter(estudiante__evento=self.object)
         total_estudiantes = estudiantes_qs.count()
         enviados = certificados_qs.filter(estado='sent').count()
         exitosos = certificados_qs.filter(estado__in=['sent', 'completed']).count()
@@ -264,7 +264,7 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         """
         try:
             # Filtrar certificados que tienen archivos o están generados
-            certs = Certificado.objects.filter(evento=self.object)
+            certs = Certificado.objects.filter(estudiante__evento=self.object)
             count = certs.count()
             
             if count == 0:
@@ -334,7 +334,6 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
             estudiante = get_object_or_404(Estudiante, id=est_id, evento=self.object)
             
             certificado, created = Certificado.objects.get_or_create(
-                evento=self.object,
                 estudiante=estudiante,
                 defaults={'estado': 'pending'}
             )
@@ -418,7 +417,7 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
 
     def download_zip(self):
         evento = self.get_object()
-        certificados = Certificado.objects.filter(evento=evento, estado='completed').exclude(archivo_pdf='')
+        certificados = Certificado.objects.filter(estudiante__evento=evento, estado='completed').exclude(archivo_pdf='')
         
         if not certificados.exists():
             messages.warning(self.request, "No hay certificados generados para descargar.")
@@ -472,7 +471,7 @@ class EventoDeleteView(LoginRequiredMixin, DetailView):
         
         try:
             # 1. Eliminar todos los certificados (esto disparará el método delete() del modelo)
-            certificados = Certificado.objects.filter(evento=self.object)
+            certificados = Certificado.objects.filter(estudiante__evento=self.object)
             cert_count = certificados.count()
             
             for cert in certificados:

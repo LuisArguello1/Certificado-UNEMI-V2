@@ -8,7 +8,23 @@ Siguiendo arquitectura de views delgadas:
 """
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import redirect
 from apps.core.services.dashboard_service import DashboardService
+
+
+class HomeView(TemplateView):
+    """
+    Portada pública del sistema.
+    - Si el usuario está autenticado -> Redirige al Dashboard.
+    - Si es anónimo -> Muestra buscador de certificados público.
+    """
+    template_name = 'core/home.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect('core:dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     """

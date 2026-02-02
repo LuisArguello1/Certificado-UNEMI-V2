@@ -134,7 +134,6 @@ class CertificadoService:
             # Usamos get_or_create para manejar reintentos sin duplicar
             for estudiante in estudiantes:
                 cert, created = Certificado.objects.get_or_create(
-                    evento=evento,
                     estudiante=estudiante,
                     defaults={'estado': 'pending'}
                 )
@@ -210,7 +209,7 @@ class CertificadoService:
             # Buscar certificados listos para enviar
             # Deben estar 'completed' (generados) y tener archivo PDF
             certificados = Certificado.objects.filter(
-                evento=evento, 
+                estudiante__evento=evento, 
                 estado='completed',
                 archivo_pdf__isnull=False
             ).exclude(archivo_pdf='')

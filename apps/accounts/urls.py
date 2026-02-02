@@ -8,8 +8,8 @@ app_name = 'accounts'
 
 urlpatterns = [
     # Auth
-    path('login/', CustomLoginView.as_view(), name='login'),
-    path('logout/', CustomLogoutView.as_view(), name='logout'),
+    path('portal-acceso/', CustomLoginView.as_view(), name='login'),
+    path('finalizar-sesion/', CustomLogoutView.as_view(), name='logout'),
     
     # User Management
     path('users/', UserListView.as_view(), name='user_list'),
