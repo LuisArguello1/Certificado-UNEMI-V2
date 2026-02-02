@@ -7,8 +7,6 @@ from apps.certificado.views.public_views import ValidacionCertificadoView
 
 env = environ.Env()
 
-
-
 urlpatterns = [
     # URL de admin protegida (configurable en .env)
     path(env('ADMIN_URL', default='admin/'), admin.site.urls),

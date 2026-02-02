@@ -291,14 +291,14 @@ class CertificadoAdmin(admin.ModelAdmin):
     list_filter = [
         'estado', 
         'enviado_email', 
-        'evento__direccion', 
-        'evento',
+        'estudiante__evento__direccion', 
+        'estudiante__evento',
         'created_at'
     ]
     search_fields = [
         'estudiante__nombres_completos', 
         'estudiante__correo_electronico',
-        'evento__nombre_evento'
+        'estudiante__evento__nombre_evento'
     ]
     readonly_fields = [
         'created_at', 
@@ -310,7 +310,7 @@ class CertificadoAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Relaciones', {
-            'fields': ('evento', 'estudiante')
+            'fields': ('estudiante',)
         }),
         ('Archivos Generados', {
             'fields': ('archivo_docx', 'archivo_pdf', 'download_links')

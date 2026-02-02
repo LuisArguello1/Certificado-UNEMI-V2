@@ -73,7 +73,7 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
     logger.info(f"Iniciando batch task para {len(certificado_ids)} certificados")
     
     certificados = Certificado.objects.select_related(
-        'evento', 'estudiante', 'evento__direccion'
+        'estudiante', 'estudiante__evento', 'estudiante__evento__direccion'
     ).filter(id__in=certificado_ids)
     
     # Mapas para seguimiento
@@ -233,7 +233,7 @@ def send_certificate_email_task(self, certificado_id: int) -> Dict[str, Any]:
 
     try:
         certificado = Certificado.objects.select_related(
-            'evento', 'estudiante'
+            'estudiante', 'estudiante__evento'
         ).get(id=certificado_id)
         
         # Validación previa

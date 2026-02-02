@@ -1,0 +1,132 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validación de Certificados | UNEMI</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="/static/icons/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+        
+        .document-container {
+            box-shadow: 
+                0 1px 3px rgba(0, 0, 0, 0.05),
+                0 10px 40px rgba(0, 0, 0, 0.08),
+                0 0 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .institutional-border {
+            border-top: 3px solid #1a4d2e;
+        }
+        
+        .info-seal {
+            background: linear-gradient(135deg, #1a4d2e 0%, #2d5f3f 100%);
+        }
+        
+        .institutional-logo {
+            filter: grayscale(0%);
+            opacity: 0.95;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="min-h-screen flex items-center justify-center p-4 md:p-8">
+        <div class="w-full max-w-2xl">
+            
+            <!-- Main Document Card -->
+            <div class="bg-white document-container institutional-border">
+                
+                <!-- Header Institucional -->
+                <div class="bg-white border-b border-gray-200 px-8 py-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <img src="{% static 'img/Unemi_correo.png' %}" alt="UNEMI" class="h-12 institutional-logo">
+                            <div class="border-l-2 border-gray-300 pl-4">
+                                <h1 class="text-sm font-bold text-gray-900 uppercase tracking-wide leading-tight">
+                                    Universidad Estatal de Milagro
+                                </h1>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mt-0.5 font-medium">
+                                    Sistema de Validación Digital
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Section -->
+                <div class="px-8 py-10 bg-gradient-to-br from-gray-50 to-white text-center">
+                    
+                    <div class="inline-flex items-center justify-center p-5 bg-green-50 rounded-full mb-6">
+                        <i class="fas fa-shield-alt text-5xl text-[#1a4d2e]"></i>
+                    </div>
+
+                    <h2 class="text-2xl font-black text-gray-900 uppercase tracking-tight leading-tight mb-3">
+                        Portal Oficial de Verificación
+                    </h2>
+                    
+                    <p class="text-base text-gray-600 font-medium max-w-lg mx-auto leading-relaxed">
+                        Bienvenido al sistema de validación de certificados de la Universidad Estatal de Milagro.
+                    </p>
+
+                    <div class="mt-8 p-6 bg-blue-50 border border-blue-100 rounded-lg max-w-lg mx-auto">
+                        <div class="flex items-start text-left space-x-4">
+                            <div class="flex-shrink-0 mt-1">
+                                <i class="fas fa-qrcode text-blue-600 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-blue-900 uppercase tracking-wide mb-1">
+                                    ¿Cómo validar un certificado?
+                                </h3>
+                                <p class="text-sm text-blue-800/80 leading-snug">
+                                    Para verificar la autenticidad de un documento, escanee el <strong>código QR</strong> impreso en el certificado oficial. El sistema lo redirigirá automáticamente a la página de validación correspondiente.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Institucional -->
+                <div class="bg-gray-900 px-8 py-5 border-t border-gray-800">
+                    <div class="flex items-center justify-between text-xs">
+                        <div>
+                            <p class="text-gray-400 font-medium uppercase tracking-wider">
+                                Universidad Estatal de Milagro
+                            </p>
+                            <p class="text-gray-500 text-xs mt-0.5">
+                                Sistema Oficial de Certificación Digital
+                            </p>
+                        </div>
+                        <div class="text-right">
+                             <a href="{% url 'accounts:login' %}" class="text-gray-700 hover:text-gray-500 transition-colors font-medium flex items-center opacity-0 hover:opacity-100">
+                                <i class="fas fa-lock mr-1.5 text-xs"></i>
+                                Admin
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Nota Legal -->
+            <div class="mt-6 px-4">
+                <p class="text-xs text-gray-400 text-center leading-relaxed font-medium">
+                    &copy; {% now "Y" %} <a href="{% url 'accounts:login' %}" class="cursor-default hover:text-gray-400 text-gray-400 no-underline transition-none">UNEMI</a>. Todos los derechos reservados.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

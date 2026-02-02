@@ -569,6 +569,9 @@ class Certificado(models.Model):
     Estado del ciclo de vida:
         pending → generating → completed → sending_email → sent
         O: pending → generating → failed
+    
+    Nota: El certificado está relacionado con un Evento a través del Estudiante.
+          No hay FK directo a Evento para evitar redundancia.
     """
     
     ESTADO_CHOICES = [
@@ -581,12 +584,6 @@ class Certificado(models.Model):
     ]
 
     # Relaciones
-    evento = models.ForeignKey(
-        Evento,
-        on_delete=models.CASCADE,
-        related_name='certificados',
-        verbose_name='Evento'
-    )
     estudiante = models.ForeignKey(
         Estudiante,
         on_delete=models.CASCADE,
@@ -661,10 +658,18 @@ class Certificado(models.Model):
         verbose_name_plural = 'Certificados'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['evento', 'estado']),
+            models.Index(fields=['estudiante', 'estado']),
             models.Index(fields=['estudiante']),
             models.Index(fields=['estado']),
         ]
+    
+    @property
+    def evento(self):
+        """
+        Propiedad derivada para acceder al evento a través del estudiante.
+        Mantiene compatibilidad con código existente.
+        """
+        return self.estudiante.evento
 
     def delete(self, *args, **kwargs):
         """
@@ -800,7 +805,8 @@ class ProcesamientoLote(models.Model):
         """
         from django.db.models import Count, Q
         
-        stats = self.evento.certificados.aggregate(
+        from .models import Certificado
+        stats = Certificado.objects.filter(estudiante__evento=self.evento).aggregate(
             total=Count('id'),
             completados=Count('id', filter=Q(estado__in=['completed', 'sent'])),
             fallidos=Count('id', filter=Q(estado='failed'))
