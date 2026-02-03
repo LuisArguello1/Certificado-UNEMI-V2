@@ -1,7 +1,33 @@
 /**
- * Loading Overlay Manager para generación de certificados
+ * Loading Overlay Manager para operaciones de certificados
  * Muestra un overlay semi-transparente con barra de progreso
+ * Soporta diferentes tipos de acciones: generación, envío, individual
  */
+
+// Tipos de acciones soportadas
+const LOADING_ACTIONS = {
+    GENERATE: {
+        title: 'Generando Certificados',
+        icon: 'fa-cog',
+        color: 'bg-black',
+        successLabel: 'Generados',
+        failedLabel: 'Fallidos'
+    },
+    SEND: {
+        title: 'Enviando Correos',
+        icon: 'fa-paper-plane',
+        color: 'bg-indigo-600',
+        successLabel: 'Enviados',
+        failedLabel: 'Fallidos'
+    },
+    INDIVIDUAL: {
+        title: 'Generando Certificado',
+        icon: 'fa-user-check',
+        color: 'bg-gray-800',
+        successLabel: 'Completado',
+        failedLabel: 'Error'
+    }
+};
 
 class LoadingOverlayManager {
     constructor() {
@@ -9,6 +35,12 @@ class LoadingOverlayManager {
         this.progressBar = null;
         this.progressText = null;
         this.messageText = null;
+        this.titleText = null;
+        this.iconElement = null;
+        this.topBar = null;
+        this.successLabel = null;
+        this.failedLabel = null;
+        this.currentAction = 'GENERATE';
         this.init();
     }
 
@@ -26,16 +58,16 @@ class LoadingOverlayManager {
                     <!-- Contenido centrado -->
                     <div class="absolute inset-0 flex items-center justify-center p-4">
                         <div class="bg-white border border-gray-300 shadow-2xl rounded-sm max-w-lg w-full p-8 relative">
-                            <!-- Barra negra superior -->
-                            <div class="absolute top-0 left-0 right-0 bg-black h-2"></div>
+                            <!-- Barra superior dinámica -->
+                            <div id="overlayTopBar" class="absolute top-0 left-0 right-0 bg-black h-2 transition-colors duration-300"></div>
                             
                             <!-- Icono y título -->
                             <div class="text-center mb-6">
                                 <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gray-50 border-2 border-gray-100 mb-4">
-                                    <i class="fas fa-cog fa-spin text-black text-2xl"></i>
+                                    <i id="overlayIcon" class="fas fa-cog fa-spin text-black text-2xl"></i>
                                 </div>
-                                <h3 class="text-sm font-black text-gray-900 uppercase tracking-tight">
-                                    Generando Certificados
+                                <h3 id="overlayTitle" class="text-sm font-black text-gray-900 uppercase tracking-tight">
+                                    Procesando
                                 </h3>
                             </div>
                             
@@ -56,11 +88,11 @@ class LoadingOverlayManager {
                             <!-- Contadores -->
                             <div class="grid grid-cols-2 gap-4 text-center">
                                 <div class="bg-gray-50 p-3 rounded-sm border border-gray-100">
-                                    <div class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Exitosos</div>
+                                    <div id="overlaySuccessLabel" class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Exitosos</div>
                                     <div id="overlaySuccessCount" class="text-xl font-black text-black">0</div>
                                 </div>
                                 <div class="bg-gray-50 p-3 rounded-sm border border-gray-100">
-                                    <div class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Fallidos</div>
+                                    <div id="overlayFailedLabel" class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Fallidos</div>
                                     <div id="overlayFailedCount" class="text-xl font-black text-red-600">0</div>
                                 </div>
                             </div>
@@ -86,16 +118,67 @@ class LoadingOverlayManager {
         this.progressBar = document.getElementById('overlayProgressBar');
         this.progressText = document.getElementById('overlayProgressText');
         this.messageText = document.getElementById('overlayMessage');
+        this.titleText = document.getElementById('overlayTitle');
+        this.iconElement = document.getElementById('overlayIcon');
+        this.topBar = document.getElementById('overlayTopBar');
         this.successCount = document.getElementById('overlaySuccessCount');
         this.failedCount = document.getElementById('overlayFailedCount');
+        this.successLabel = document.getElementById('overlaySuccessLabel');
+        this.failedLabel = document.getElementById('overlayFailedLabel');
+    }
+
+    /**
+     * Configura la apariencia según el tipo de acción
+     * @param {string} actionType - Tipo de acción: 'GENERATE', 'SEND', 'INDIVIDUAL'
+     */
+    setAction(actionType) {
+        const action = LOADING_ACTIONS[actionType] || LOADING_ACTIONS.GENERATE;
+        this.currentAction = actionType;
+
+        if (this.titleText) {
+            this.titleText.textContent = action.title;
+        }
+
+        if (this.iconElement) {
+            // Remover clases de icono anteriores y añadir la nueva
+            this.iconElement.className = `fas ${action.icon} fa-spin text-black text-2xl`;
+        }
+
+        if (this.topBar) {
+            // Remover clases de color anteriores
+            this.topBar.className = `absolute top-0 left-0 right-0 ${action.color} h-2 transition-colors duration-300`;
+        }
+
+        if (this.progressBar) {
+            // Actualizar color de la barra de progreso
+            this.progressBar.className = `${action.color} h-full transition-all duration-500 ease-out flex items-center justify-center`;
+        }
+
+        if (this.successLabel) {
+            this.successLabel.textContent = action.successLabel;
+        }
+
+        if (this.failedLabel) {
+            this.failedLabel.textContent = action.failedLabel;
+        }
+    }
+
+    /**
+     * Obtiene el tipo de acción actual
+     * @returns {string} Tipo de acción actual
+     */
+    getAction() {
+        return this.currentAction;
     }
 
     /**
      * Muestra el overlay
      * @param {string} message - Mensaje inicial a mostrar
+     * @param {string} actionType - Tipo de acción: 'GENERATE', 'SEND', 'INDIVIDUAL'
      */
-    show(message = 'Iniciando generación...') {
+    show(message = 'Iniciando proceso...', actionType = 'GENERATE') {
         if (this.overlay) {
+            this.setAction(actionType);
             this.updateMessage(message);
             this.updateProgress(0, 0, 0);
             this.overlay.classList.remove('hidden');

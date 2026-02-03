@@ -182,9 +182,9 @@ function confirmDeleteModal() {
  * @param {number} estId - ID del estudiante
  */
 function generateIndividual(estId) {
-    // Mostrar loading overlay
+    // Mostrar loading overlay con tipo INDIVIDUAL
     if (window.loadingOverlay) {
-        window.loadingOverlay.show('Generando certificado individual...');
+        window.loadingOverlay.show('Iniciando generación individual...', 'INDIVIDUAL');
     }
 
     const formData = new FormData();
@@ -200,7 +200,7 @@ function generateIndividual(estId) {
             if (data.success) {
                 showToast("PROCESANDO CERTIFICADO");
                 if (window.loadingOverlay) {
-                    window.loadingOverlay.updateMessage('Certificado en proceso. Espere por favor...');
+                    window.loadingOverlay.updateMessage('Generando certificado. Espere por favor...');
                 }
                 startIndividualPolling(data.certificado_id);
             } else {
@@ -271,9 +271,9 @@ function startGeneration() {
         if (icon) icon.classList.add('fa-spin');
     }
 
-    // Mostrar loading overlay
+    // Mostrar loading overlay con tipo GENERATE
     if (window.loadingOverlay) {
-        window.loadingOverlay.show('Iniciando generación masiva de certificados...');
+        window.loadingOverlay.show('Iniciando generación masiva de certificados...', 'GENERATE');
     }
 
     const formData = new FormData();
@@ -287,10 +287,10 @@ function startGeneration() {
                 showToast("GENERACIÓN POR LOTES INICIADA");
 
                 if (window.loadingOverlay) {
-                    window.loadingOverlay.updateMessage('Procesando certificados. Por favor NO cierre ni recargue esta página...');
+                    window.loadingOverlay.updateMessage('Generando certificados. Por favor NO cierre ni recargue esta página...');
                 }
 
-                startPolling();
+                startPolling('GENERATE');
             } else {
                 showToast(data.error.toUpperCase());
                 if (btn) {
@@ -319,9 +319,24 @@ function startGeneration() {
 
 /**
  * Inicia el polling para monitorear el progreso
+ * @param {string} actionType - Tipo de acción: 'GENERATE' o 'SEND'
  */
-function startPolling() {
+function startPolling(actionType = 'GENERATE') {
     if (pollInterval) clearInterval(pollInterval);
+
+    // Mensajes según el tipo de acción
+    const messages = {
+        GENERATE: {
+            processing: 'Generando certificados',
+            complete: '¡Generación completada! Recargando página...'
+        },
+        SEND: {
+            processing: 'Enviando correos electrónicos',
+            complete: '¡Envío completado! Recargando página...'
+        }
+    };
+
+    const currentMessages = messages[actionType] || messages.GENERATE;
 
     // Función helper para obtener y actualizar progreso
     const checkProgress = () => {
@@ -350,13 +365,13 @@ function startPolling() {
                     if (window.loadingOverlay) {
                         // Si el overlay está oculto pero estamos procesando, mostrarlo (caso recarga de página)
                         if (data.status === 'processing' && window.loadingOverlay.overlay.classList.contains('hidden')) {
-                            window.loadingOverlay.show('Procesando certificados...');
+                            window.loadingOverlay.show(`${currentMessages.processing}...`, actionType);
                         }
 
                         // Actualizar mensaje con progreso si está visible
                         if (!window.loadingOverlay.overlay.classList.contains('hidden')) {
                             window.loadingOverlay.updateMessage(
-                                `Procesando certificados: ${data.exitosos} de ${data.total} completados (${progress}%)`
+                                `${currentMessages.processing}: ${data.exitosos} de ${data.total} completados (${progress}%)`
                             );
                             window.loadingOverlay.updateProgress(progress, data.exitosos, data.fallidos);
                         }
@@ -366,7 +381,7 @@ function startPolling() {
                     if (data.is_complete) {
                         clearInterval(pollInterval);
                         if (window.loadingOverlay) {
-                            window.loadingOverlay.updateMessage('¡Generación completada! Recargando página...');
+                            window.loadingOverlay.updateMessage(currentMessages.complete);
                         }
                         setTimeout(() => {
                             location.reload();
@@ -412,9 +427,9 @@ function confirmSend() {
     formData.append('action', 'start_sending');
     formData.append('csrfmiddlewaretoken', csrftoken);
 
-    // Mostrar loading overlay
+    // Mostrar loading overlay con tipo SEND
     if (window.loadingOverlay) {
-        window.loadingOverlay.show('Iniciando envío masivo de correos...');
+        window.loadingOverlay.show('Iniciando envío masivo de correos...', 'SEND');
     }
 
     fetch('', { method: 'POST', body: formData })
@@ -424,10 +439,10 @@ function confirmSend() {
                 showToast(data.message.toUpperCase());
 
                 if (window.loadingOverlay) {
-                    window.loadingOverlay.updateMessage('Envío iniciado. Procesando correos...');
+                    window.loadingOverlay.updateMessage('Enviando correos electrónicos. Por favor espere...');
                 }
 
-                startPolling();
+                startPolling('SEND');
             } else {
                 showToast(data.error.toUpperCase());
                 if (window.loadingOverlay) {

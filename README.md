@@ -135,19 +135,6 @@ REDIS_URL=redis://localhost:6379/0
 
 
 # ═══════════════════════════════════════════════════════════════
-#  ALMACENAMIENTO DE ARCHIVOS
-# ═══════════════════════════════════════════════════════════════
-
-# Usar almacenamiento en red (NAS) o local
-USE_NAS_STORAGE=False
-
-# Ruta del NAS (solo si USE_NAS_STORAGE=True)
-# Ejemplo Windows: Z:/Certificados
-# Ejemplo Linux: /mnt/nas/certificados
-MEDIA_ROOT_PATH=Z:/media
-
-
-# ═══════════════════════════════════════════════════════════════
 #  URL PÚBLICA (Para Códigos QR)
 # ═══════════════════════════════════════════════════════════════
 

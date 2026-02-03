@@ -5,7 +5,7 @@ class SidebarController {
         this.minWidth = 200;
         this.maxWidth = 420;
         this.defaultWidth = 260;
-        this.storageKey = 'nas_sidebar_state_v4';
+        this.storageKey = 'sidebar_state_v5';
 
         // Elements
         this.sidebar = document.getElementById('sidebar-container');

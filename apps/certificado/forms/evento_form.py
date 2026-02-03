@@ -7,7 +7,7 @@ Hereda de CoreBaseForm para estilos Tailwind automáticos.
 from django import forms
 from django.core.exceptions import ValidationError
 from apps.core.forms.base_form import CoreBaseForm
-from ..models import Direccion, VariantePlantilla, Modalidad, Tipo, TipoEvento
+from ..models import Direccion, VariantePlantilla, Modalidad, Tipo, TipoEvento, PlantillaBase
 
 
 class EventoForm(CoreBaseForm):
@@ -105,19 +105,23 @@ class EventoForm(CoreBaseForm):
     objetivo_programa = forms.CharField(
         label='Objetivo del Programa',
         widget=forms.Textarea(attrs={
-            'rows': 3,
+            'rows': 5,
             'placeholder': 'Describa el objetivo principal...',
-            'class': 'w-full text-xs border-gray-300 rounded-sm focus:border-indigo-500 focus:ring-indigo-500'
-        })
+            'class': 'w-full text-xs border-gray-300 rounded-sm focus:border-indigo-500 focus:ring-indigo-500 ckeditor-target',
+            'data-editor-type': 'objetivo'
+        }),
+        help_text='Puede usar formato enriquecido (negritas, cursivas, listas, tablas)'
     )
     
     contenido_programa = forms.CharField(
         label='Contenido del Programa',
         widget=forms.Textarea(attrs={
-            'rows': 3,
+            'rows': 5,
             'placeholder': 'Describa el contenido resumido...',
-            'class': 'w-full text-xs border-gray-300 rounded-sm focus:border-indigo-500 focus:ring-indigo-500'
-        })
+            'class': 'w-full text-xs border-gray-300 rounded-sm focus:border-indigo-500 focus:ring-indigo-500 ckeditor-target',
+            'data-editor-type': 'contenido'
+        }),
+        help_text='Puede usar formato enriquecido (negritas, cursivas, listas, tablas)'
     )
     
     def __init__(self, *args, **kwargs):
