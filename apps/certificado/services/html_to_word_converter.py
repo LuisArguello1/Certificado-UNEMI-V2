@@ -17,51 +17,96 @@ Uso:
     >>> doc = Document()
     >>> paragraph = doc.add_paragraph()
     >>> converter.convert_and_insert(html_content, paragraph, document=doc)
+
+Author: Sistema de Certificados UNEMI
+Version: 2.0.0
 """
 
-from typing import Optional, List, Dict, Any, Tuple
+import re
+import logging
+from typing import Optional, List, Dict, Any, Final
 from bs4 import BeautifulSoup, NavigableString, Tag
-from docx.shared import Pt, RGBColor, Inches, Twips
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx import Document
+from docx.text.paragraph import Paragraph
+from docx.table import Table
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import OxmlElement
 from docx.oxml.ns import qn
-from docx.table import _Cell, Table
-import logging
-import re
 
+# Configuración de logging
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# CONSTANTES
+# ============================================================================
+
+DEFAULT_FONT_SIZE: Final[int] = 11  # Tamaño de fuente por defecto en puntos
+TABLE_WIDTH_PCT: Final[int] = 5000  # Ancho de tabla: 100% en unidades de Word
+
+# Tamaños de fuente para encabezados HTML
+HEADING_FONT_SIZES: Final[Dict[str, int]] = {
+    'h1': 18,
+    'h2': 16,
+    'h3': 14,
+    'h4': 12,
+    'h5': 11,
+    'h6': 11
+}
+
+
+# ============================================================================
+# TIPOS DE DATOS
+# ============================================================================
+
+FormatDict = Dict[str, bool]  # Diccionario de formato (bold, italic, underline)
+TableData = Dict[str, List[List[Dict[str, Any]]]]  # Datos de tabla
+
+
+# ============================================================================
+# CONVERSOR PRINCIPAL
+# ============================================================================
 
 class HTMLToWordConverter:
     """
     Conversor de HTML a formato Word nativo.
     
-    Soporta tablas nativas de Word cuando se proporciona el documento.
+    Características:
+        - Conserva el formato del HTML original
+        - Crea tablas nativas de Word (no texto plano)
+        - Preserva la estructura de párrafos
+        - Soporta listas con viñetas y numeradas
     
     Attributes:
-        default_font_size (int): Tamaño de fuente por defecto en puntos.
-        preserve_spacing (bool): Si debe preservar espacios múltiples.
+        default_font_size: Tamaño de fuente por defecto en puntos.
+        preserve_spacing: Si debe preservar espacios múltiples.
     """
     
     def __init__(
         self,
-        default_font_size: int = 11,
+        default_font_size: int = DEFAULT_FONT_SIZE,
         preserve_spacing: bool = True
-    ):
+    ) -> None:
+        """
+        Inicializa el conversor.
+        
+        Args:
+            default_font_size: Tamaño de fuente por defecto.
+            preserve_spacing: Si debe preservar espacios múltiples.
+        """
         self.default_font_size = default_font_size
         self.preserve_spacing = preserve_spacing
         self._needs_line_break = False
-        self._document = None  # Referencia al documento para crear tablas
-        self._current_paragraph = None  # Párrafo actual
-        self._pending_tables = []  # Tablas pendientes de insertar
+        self._document: Optional[Document] = None
+        self._current_paragraph: Optional[Paragraph] = None
+        self._pending_tables: List[TableData] = []
         
     def convert_and_insert(
         self,
         html_content: str,
-        target_paragraph,
+        target_paragraph: Paragraph,
         clear_paragraph: bool = True,
-        document=None,
+        document: Optional[Document] = None,
         align_left: bool = True
     ) -> None:
         """
@@ -72,29 +117,25 @@ class HTMLToWordConverter:
             target_paragraph: Párrafo de Word donde insertar el contenido.
             clear_paragraph: Si debe limpiar el párrafo antes de insertar.
             document: Documento de Word (necesario para crear tablas nativas).
-            align_left: Si es True, alinea el párrafo a la izquierda para evitar
-                       justificación forzada en textos cortos.
+            align_left: Si es True, alinea el párrafo a la izquierda.
         """
         if not html_content or not html_content.strip():
             logger.warning("Contenido vacío recibido en convert_and_insert")
             return
         
         try:
-            # Guardar referencia al documento
             self._document = document or self._get_document_from_paragraph(target_paragraph)
             self._current_paragraph = target_paragraph
             self._pending_tables = []
             
-            # Limpiar el párrafo si es necesario
             if clear_paragraph:
                 self._clear_paragraph(target_paragraph)
             
-            # Alinear a la izquierda para evitar justificación forzada
             if align_left:
                 try:
                     target_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 except Exception:
-                    pass  # Ignorar si no se puede cambiar la alineación
+                    pass
             
             # Detectar si es texto plano o HTML
             if self._is_plain_text(html_content):
@@ -108,14 +149,18 @@ class HTMLToWordConverter:
                     {'bold': False, 'italic': False, 'underline': False}
                 )
             
-            # Insertar tablas pendientes después del párrafo
+            # Insertar tablas pendientes
             self._insert_pending_tables()
             
         except Exception as e:
             logger.error(f"Error al convertir contenido a Word: {e}", exc_info=True)
             self._insert_plain_text(target_paragraph, html_content)
     
-    def _get_document_from_paragraph(self, paragraph):
+    # ========================================================================
+    # MÉTODOS PRIVADOS - UTILIDADES
+    # ========================================================================
+    
+    def _get_document_from_paragraph(self, paragraph: Paragraph) -> Optional[Document]:
         """Obtiene el documento de Word desde un párrafo."""
         try:
             if hasattr(paragraph, 'part') and hasattr(paragraph.part, 'document'):
@@ -129,196 +174,51 @@ class HTMLToWordConverter:
             logger.warning(f"Error obteniendo documento: {e}")
             return None
     
-    def _insert_pending_tables(self):
-        """Inserta las tablas pendientes después del párrafo actual."""
-        if not self._pending_tables or not self._document:
-            logger.debug(f"No hay tablas pendientes o documento: tables={len(self._pending_tables) if self._pending_tables else 0}, doc={self._document is not None}")
-            return
-        
-        try:
-            # Obtener el elemento XML del párrafo actual
-            para_element = self._current_paragraph._element
-            
-            for table_data in self._pending_tables:
-                # Crear la tabla de Word
-                rows_data = table_data['rows']
-                if not rows_data:
-                    continue
-                
-                num_rows = len(rows_data)
-                num_cols = max(len(row) for row in rows_data) if rows_data else 1
-                
-                logger.info(f"Creando tabla nativa de Word: {num_rows} filas x {num_cols} columnas")
-                
-                # Crear tabla
-                table = self._document.add_table(rows=num_rows, cols=num_cols)
-                
-                # Intentar aplicar estilo, pero no fallar si no existe
-                try:
-                    table.style = 'Table Grid'
-                except KeyError:
-                    # El estilo no existe en la plantilla, aplicar bordes manualmente
-                    self._apply_table_borders(table)
-                
-                # Configurar AutoFit para que la tabla se ajuste al contenido
-                table.autofit = True
-                
-                # Llenar la tabla
-                for row_idx, row_data in enumerate(rows_data):
-                    for col_idx, cell_data in enumerate(row_data):
-                        if col_idx < num_cols:
-                            cell = table.rows[row_idx].cells[col_idx]
-                            cell.text = cell_data.get('text', '')
-                            
-                            # Aplicar formato
-                            if cell_data.get('bold') and cell.paragraphs:
-                                for run in cell.paragraphs[0].runs:
-                                    run.bold = True
-                
-                # Configurar ancho de tabla al 100% y columnas equitativas
-                self._set_table_autofit(table, num_cols)
-                
-                # Mover la tabla después del párrafo actual
-                table_element = table._tbl
-                para_element.addnext(table_element)
-                
-                logger.debug(f"Tabla insertada exitosamente: {num_rows}x{num_cols}")
-                
-                # Actualizar para que la siguiente tabla vaya después de esta
-                para_element = table_element
-                
-        except Exception as e:
-            logger.error(f"Error insertando tablas: {e}", exc_info=True)
-        
-        self._pending_tables = []
-    
-    def _set_table_autofit(self, table, num_cols: int) -> None:
-        """
-        Configura la tabla para que ajuste automáticamente al contenido.
-        Las columnas se dimensionan según el texto, evitando partir palabras.
-        """
-        try:
-            tbl = table._tbl
-            tblPr = tbl.tblPr
-            if tblPr is None:
-                tblPr = OxmlElement('w:tblPr')
-                tbl.insert(0, tblPr)
-            
-            # Configurar tblW (ancho de tabla) a 100% (5000 = 100% en fifths of a percent)
-            tblW = tblPr.find(qn('w:tblW'))
-            if tblW is None:
-                tblW = OxmlElement('w:tblW')
-                tblPr.append(tblW)
-            tblW.set(qn('w:type'), 'pct')  # Porcentaje
-            tblW.set(qn('w:w'), '5000')    # 100% (5000 = 100% en unidades de Word)
-            
-            # Configurar tblLayout a autofit para ajustar al contenido sin partir palabras
-            tblLayout = tblPr.find(qn('w:tblLayout'))
-            if tblLayout is None:
-                tblLayout = OxmlElement('w:tblLayout')
-                tblPr.append(tblLayout)
-            tblLayout.set(qn('w:type'), 'autofit')  # Autofit permite ajuste dinámico
-            
-            # Distribuir columnas equitativamente
-            col_width_pct = 5000 // num_cols  # Dividir 100% entre columnas
-            
-            for row in table.rows:
-                for cell in row.cells:
-                    tcPr = cell._tc.tcPr
-                    if tcPr is None:
-                        tcPr = OxmlElement('w:tcPr')
-                        cell._tc.insert(0, tcPr)
-                    
-                    # Configurar ancho de celda
-                    tcW = tcPr.find(qn('w:tcW'))
-                    if tcW is None:
-                        tcW = OxmlElement('w:tcW')
-                        tcPr.append(tcW)
-                    tcW.set(qn('w:type'), 'pct')
-                    tcW.set(qn('w:w'), str(col_width_pct))
-                    
-                    # Configurar noWrap para evitar partición de palabras
-                    noWrap = tcPr.find(qn('w:noWrap'))
-                    if noWrap is not None:
-                        tcPr.remove(noWrap)
-                    
-                    # Configurar los párrafos de la celda
-                    for para in cell.paragraphs:
-                        try:
-                            pPr = para._p.get_or_add_pPr()
-                            
-                            # Desactivar hyphenation (NO partir palabras con guión)
-                            suppressAutoHyphens = pPr.find(qn('w:suppressAutoHyphens'))
-                            if suppressAutoHyphens is None:
-                                suppressAutoHyphens = OxmlElement('w:suppressAutoHyphens')
-                                pPr.append(suppressAutoHyphens)
-                            suppressAutoHyphens.set(qn('w:val'), '1')
-                            
-                        except Exception:
-                            pass
-            
-        except Exception as e:
-            logger.warning(f"No se pudo configurar ancho de tabla: {e}")
-    
-    def _apply_table_borders(self, table) -> None:
-        """Aplica bordes a una tabla cuando el estilo 'Table Grid' no está disponible."""
-        try:
-            tbl = table._tbl
-            tblPr = tbl.tblPr if tbl.tblPr is not None else OxmlElement('w:tblPr')
-            
-            # Crear elemento de bordes
-            tblBorders = OxmlElement('w:tblBorders')
-            
-            for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
-                border = OxmlElement(f'w:{border_name}')
-                border.set(qn('w:val'), 'single')
-                border.set(qn('w:sz'), '4')  # Grosor del borde
-                border.set(qn('w:space'), '0')
-                border.set(qn('w:color'), '000000')  # Negro
-                tblBorders.append(border)
-            
-            tblPr.append(tblBorders)
-            if tbl.tblPr is None:
-                tbl.insert(0, tblPr)
-                
-        except Exception as e:
-            logger.warning(f"No se pudieron aplicar bordes a la tabla: {e}")
+    def _clear_paragraph(self, paragraph: Paragraph) -> None:
+        """Limpia todo el contenido de un párrafo."""
+        for run in paragraph.runs:
+            run.text = ''
     
     def _is_plain_text(self, content: str) -> bool:
         """Detecta si el contenido es texto plano o HTML."""
         if not content:
             return True
-        html_pattern = r'<(p|br|strong|b|em|i|u|ul|ol|li|table|tr|td|th|div|span|h[1-6]|figure)[>\s/]'
+        html_pattern = r'<(p|br|strong|b|em|i|u|ul|ol|li|table|tr|td|th|div|span|h[1-6]|figure)[\s/>]'
         return not bool(re.search(html_pattern, content, re.IGNORECASE))
     
-    def _insert_plain_text(self, paragraph, text: str) -> None:
+    def _insert_plain_text(self, paragraph: Paragraph, text: str) -> None:
         """Inserta texto plano preservando saltos de línea."""
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         lines = text.split('\n')
         
         for i, line in enumerate(lines):
-            # Preservar líneas vacías agregando un salto de línea
             if line.strip():
                 run = paragraph.add_run(line.strip())
                 if self.default_font_size:
                     run.font.size = Pt(self.default_font_size)
-            # Siempre agregar break entre líneas (incluso si la línea está vacía)
             if i < len(lines) - 1:
                 paragraph.add_run().add_break()
     
-    def _clear_paragraph(self, paragraph) -> None:
-        """Limpia todo el contenido de un párrafo."""
-        for run in paragraph.runs:
-            run.text = ''
+    # ========================================================================
+    # MÉTODOS PRIVADOS - PROCESAMIENTO HTML
+    # ========================================================================
     
     def _process_elements(
         self,
-        element,
-        paragraph,
-        parent_formatting: Dict[str, bool],
+        element: Any,
+        paragraph: Paragraph,
+        parent_formatting: FormatDict,
         is_first_in_block: bool = True
     ) -> None:
-        """Procesa recursivamente elementos HTML."""
+        """
+        Procesa recursivamente elementos HTML.
+        
+        Args:
+            element: Elemento HTML a procesar.
+            paragraph: Párrafo de destino.
+            parent_formatting: Formato heredado del padre.
+            is_first_in_block: Si es el primer elemento en un bloque.
+        """
         first_child = True
         
         for child in element.children:
@@ -337,7 +237,7 @@ class HTMLToWordConverter:
                 tag_name = child.name.lower()
                 new_formatting = parent_formatting.copy()
                 
-                # === FORMATOS DE TEXTO ===
+                # Procesar según el tipo de tag
                 if tag_name in ['strong', 'b']:
                     new_formatting['bold'] = True
                     self._process_elements(child, paragraph, new_formatting, first_child)
@@ -350,51 +250,19 @@ class HTMLToWordConverter:
                     new_formatting['underline'] = True
                     self._process_elements(child, paragraph, new_formatting, first_child)
                 
-                # === SALTOS DE LÍNEA ===
                 elif tag_name == 'br':
                     paragraph.add_run().add_break()
                     self._needs_line_break = False
                 
                 elif tag_name == 'p':
-                    # Siempre agregar salto de línea antes de un nuevo párrafo (excepto el primero)
-                    if not is_first_in_block and not first_child:
-                        paragraph.add_run().add_break()
-                    
-                    # Detectar alineación desde el atributo style o class de CKEditor
-                    alignment = self._get_alignment_from_element(child)
-                    if alignment:
-                        try:
-                            paragraph.alignment = alignment
-                        except Exception:
-                            pass
-                    
-                    # Detectar y aplicar line-height (interlineado)
-                    line_height = self._get_line_height_from_element(child)
-                    if line_height:
-                        self._apply_line_height(paragraph, line_height)
-                    
-                    # Verificar si el párrafo está vacío (solo tiene &nbsp; o espacios)
-                    child_text = child.get_text()
-                    is_empty_paragraph = not child_text.strip() or child_text.strip() == '\u00a0'
-                    
-                    if is_empty_paragraph:
-                        # Párrafo vacío: agregar un salto de línea para preservar el espacio
-                        paragraph.add_run().add_break()
-                    else:
-                        self._process_elements(child, paragraph, parent_formatting, True)
-                    
-                    self._needs_line_break = True
+                    self._process_paragraph_tag(child, paragraph, parent_formatting, first_child, is_first_in_block)
                 
-                # === LISTAS ===
                 elif tag_name in ['ul', 'ol']:
-                    ordered = (tag_name == 'ol')
-                    self._process_list_inline(child, paragraph, parent_formatting, ordered)
+                    self._process_list_inline(child, paragraph, parent_formatting, tag_name == 'ol')
                 
-                # === TABLAS (nativas de Word) ===
                 elif tag_name == 'table':
                     self._queue_table(child)
                 
-                # === FIGURE (CKEditor envuelve tablas) ===
                 elif tag_name == 'figure':
                     table = child.find('table')
                     if table:
@@ -402,55 +270,87 @@ class HTMLToWordConverter:
                     else:
                         self._process_elements(child, paragraph, parent_formatting, first_child)
                 
-                # === TBODY, THEAD ===
-                elif tag_name in ['tbody', 'thead', 'tfoot']:
-                    self._process_elements(child, paragraph, parent_formatting, first_child)
-                
-                # === OTROS ===
-                elif tag_name in ['div', 'span', 'a']:
+                elif tag_name in ['tbody', 'thead', 'tfoot', 'div', 'span', 'a']:
                     self._process_elements(child, paragraph, parent_formatting, first_child)
                 
                 elif tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                    if not first_child:
-                        paragraph.add_run().add_break()
-                    
-                    # Detectar alineación
-                    alignment = self._get_alignment_from_element(child)
-                    if alignment:
-                        try:
-                            paragraph.alignment = alignment
-                        except Exception:
-                            pass
-                    
-                    new_formatting['bold'] = True
-                    # Tamaño según nivel de heading
-                    heading_sizes = {'h1': 18, 'h2': 16, 'h3': 14, 'h4': 12, 'h5': 11, 'h6': 11}
-                    heading_size = heading_sizes.get(tag_name, self.default_font_size)
-                    
-                    # Procesar contenido con formato especial
-                    for heading_child in child.children:
-                        if isinstance(heading_child, NavigableString):
-                            text = str(heading_child).strip()
-                            if text:
-                                run = paragraph.add_run(text)
-                                run.bold = True
-                                run.font.size = Pt(heading_size)
-                        elif isinstance(heading_child, Tag):
-                            # Procesar tags internos manteniendo el tamaño
-                            text = heading_child.get_text(strip=True)
-                            if text:
-                                run = paragraph.add_run(text)
-                                run.bold = True
-                                run.font.size = Pt(heading_size)
-                    
-                    self._needs_line_break = True
+                    self._process_heading_tag(child, paragraph, tag_name, first_child)
                 
                 else:
                     self._process_elements(child, paragraph, parent_formatting, first_child)
             
             first_child = False
     
-    def _add_formatted_text(self, paragraph, text: str, formatting: Dict[str, bool]) -> None:
+    def _process_paragraph_tag(
+        self,
+        child: Tag,
+        paragraph: Paragraph,
+        parent_formatting: FormatDict,
+        first_child: bool,
+        is_first_in_block: bool
+    ) -> None:
+        """Procesa un tag <p>."""
+        if not is_first_in_block and not first_child:
+            paragraph.add_run().add_break()
+        
+        alignment = self._get_alignment_from_element(child)
+        if alignment:
+            try:
+                paragraph.alignment = alignment
+            except Exception:
+                pass
+        
+        line_height = self._get_line_height_from_element(child)
+        if line_height:
+            self._apply_line_height(paragraph, line_height)
+        
+        child_text = child.get_text()
+        is_empty_paragraph = not child_text.strip() or child_text.strip() == '\u00a0'
+        
+        if is_empty_paragraph:
+            paragraph.add_run().add_break()
+        else:
+            self._process_elements(child, paragraph, parent_formatting, True)
+        
+        self._needs_line_break = True
+    
+    def _process_heading_tag(
+        self,
+        child: Tag,
+        paragraph: Paragraph,
+        tag_name: str,
+        first_child: bool
+    ) -> None:
+        """Procesa tags de encabezado (h1-h6)."""
+        if not first_child:
+            paragraph.add_run().add_break()
+        
+        alignment = self._get_alignment_from_element(child)
+        if alignment:
+            try:
+                paragraph.alignment = alignment
+            except Exception:
+                pass
+        
+        heading_size = HEADING_FONT_SIZES.get(tag_name, DEFAULT_FONT_SIZE)
+        
+        for heading_child in child.children:
+            if isinstance(heading_child, NavigableString):
+                text = str(heading_child).strip()
+                if text:
+                    run = paragraph.add_run(text)
+                    run.bold = True
+                    run.font.size = Pt(heading_size)
+            elif isinstance(heading_child, Tag):
+                text = heading_child.get_text(strip=True)
+                if text:
+                    run = paragraph.add_run(text)
+                    run.bold = True
+                    run.font.size = Pt(heading_size)
+        
+        self._needs_line_break = True
+    
+    def _add_formatted_text(self, paragraph: Paragraph, text: str, formatting: FormatDict) -> None:
         """Añade texto con formato al párrafo."""
         run = paragraph.add_run(text)
         run.bold = formatting.get('bold', False)
@@ -460,18 +360,8 @@ class HTMLToWordConverter:
             run.font.size = Pt(self.default_font_size)
     
     def _get_alignment_from_element(self, element: Tag) -> Optional[Any]:
-        """
-        Extrae la alineación de un elemento HTML.
-        
-        Busca en:
-        - Atributo class (text-left, text-center, text-right, text-justify)
-        - Atributo style (text-align: left/center/right/justify)
-        
-        Returns:
-            Constante WD_ALIGN_PARAGRAPH o None si no hay alineación.
-        """
+        """Extrae la alineación de un elemento HTML."""
         try:
-            # Buscar en las clases
             classes = element.get('class', [])
             if isinstance(classes, str):
                 classes = classes.split()
@@ -486,7 +376,6 @@ class HTMLToWordConverter:
                 elif 'text-justify' in cls or 'align-justify' in cls:
                     return WD_ALIGN_PARAGRAPH.JUSTIFY
             
-            # Buscar en el atributo style
             style = element.get('style', '')
             if 'text-align' in style:
                 if 'left' in style:
@@ -504,19 +393,10 @@ class HTMLToWordConverter:
         return None
     
     def _get_line_height_from_element(self, element: Tag) -> Optional[float]:
-        """
-        Extrae el interlineado de un elemento HTML.
-        
-        Busca en el atributo style (line-height: 1.5, etc.)
-        
-        Returns:
-            Float con el valor de line-height o None.
-        """
+        """Extrae el interlineado de un elemento HTML."""
         try:
             style = element.get('style', '')
             if 'line-height' in style:
-                # Extraer el valor numérico
-                import re
                 match = re.search(r'line-height:\s*([0-9.]+)', style)
                 if match:
                     return float(match.group(1))
@@ -525,12 +405,9 @@ class HTMLToWordConverter:
         
         return None
     
-    def _apply_line_height(self, paragraph, line_height: float) -> None:
+    def _apply_line_height(self, paragraph: Paragraph, line_height: float) -> None:
         """Aplica el interlineado a un párrafo de Word."""
         try:
-            from docx.shared import Pt
-            # Convertir line-height a espaciado de Word
-            # line-height 1.0 = single, 1.5 = 1.5 lines, 2.0 = double
             if line_height <= 1.0:
                 paragraph.paragraph_format.line_spacing = 1.0
             else:
@@ -538,11 +415,15 @@ class HTMLToWordConverter:
         except Exception as e:
             logger.debug(f"Error aplicando line-height: {e}")
 
+    # ========================================================================
+    # MÉTODOS PRIVADOS - LISTAS
+    # ========================================================================
+
     def _process_list_inline(
         self,
         list_element: Tag,
-        paragraph,
-        parent_formatting: Dict[str, bool],
+        paragraph: Paragraph,
+        parent_formatting: FormatDict,
         ordered: bool = False
     ) -> None:
         """Procesa listas HTML como texto con viñetas/números."""
@@ -551,22 +432,18 @@ class HTMLToWordConverter:
             if not items:
                 return
             
-            # Añadir salto de línea antes de la lista si hay contenido previo
             if paragraph.text.strip():
                 paragraph.add_run().add_break()
             
             for index, item in enumerate(items, start=1):
-                # Añadir salto entre items (excepto el primero)
                 if index > 1:
                     paragraph.add_run().add_break()
                 
-                # Prefijo de viñeta o número
                 prefix = f"{index}. " if ordered else "• "
                 prefix_run = paragraph.add_run(prefix)
                 if self.default_font_size:
                     prefix_run.font.size = Pt(self.default_font_size)
                 
-                # Procesar contenido del item de forma especial para listas
                 self._process_list_item_content(item, paragraph, parent_formatting)
             
             self._needs_line_break = True
@@ -577,13 +454,10 @@ class HTMLToWordConverter:
     def _process_list_item_content(
         self,
         item_element: Tag,
-        paragraph,
-        parent_formatting: Dict[str, bool]
+        paragraph: Paragraph,
+        parent_formatting: FormatDict
     ) -> None:
-        """
-        Procesa el contenido de un elemento <li> sin añadir breaks entre elementos.
-        Esto evita que los elementos internos (como <p>) rompan el formato de la lista.
-        """
+        """Procesa el contenido de un elemento <li>."""
         for child in item_element.children:
             if isinstance(child, NavigableString):
                 text = str(child).strip()
@@ -594,7 +468,6 @@ class HTMLToWordConverter:
                 tag_name = child.name.lower()
                 new_formatting = parent_formatting.copy()
                 
-                # Manejar formatos inline
                 if tag_name in ['strong', 'b']:
                     new_formatting['bold'] = True
                     self._process_list_item_content(child, paragraph, new_formatting)
@@ -610,15 +483,10 @@ class HTMLToWordConverter:
                 elif tag_name == 'br':
                     paragraph.add_run().add_break()
                 
-                elif tag_name == 'p':
-                    # Para <p> dentro de <li>, solo extraer el texto sin breaks adicionales
-                    self._process_list_item_content(child, paragraph, parent_formatting)
-                
-                elif tag_name in ['span', 'a', 'div']:
+                elif tag_name in ['p', 'span', 'a', 'div']:
                     self._process_list_item_content(child, paragraph, parent_formatting)
                 
                 elif tag_name in ['ul', 'ol']:
-                    # Lista anidada - añadir con indentación
                     paragraph.add_run().add_break()
                     nested_ordered = (tag_name == 'ol')
                     nested_items = child.find_all('li', recursive=False)
@@ -632,24 +500,22 @@ class HTMLToWordConverter:
                         self._process_list_item_content(nested_item, paragraph, parent_formatting)
                 
                 else:
-                    # Otros elementos: extraer texto
                     text = child.get_text(strip=True)
                     if text:
                         self._add_formatted_text(paragraph, text, parent_formatting)
     
+    # ========================================================================
+    # MÉTODOS PRIVADOS - TABLAS
+    # ========================================================================
+    
     def _queue_table(self, table_element: Tag) -> None:
-        """
-        Encola una tabla para insertar después del párrafo.
-        
-        Extrae los datos de la tabla HTML y los guarda para crear
-        una tabla nativa de Word después.
-        """
+        """Encola una tabla para insertar después del párrafo."""
         try:
             rows = table_element.find_all('tr')
             if not rows:
                 return
             
-            table_data = {'rows': []}
+            table_data: TableData = {'rows': []}
             
             for row in rows:
                 cells = row.find_all(['td', 'th'])
@@ -671,20 +537,173 @@ class HTMLToWordConverter:
                 
         except Exception as e:
             logger.error(f"Error encolando tabla: {e}", exc_info=True)
+    
+    def _insert_pending_tables(self) -> None:
+        """Inserta las tablas pendientes después del párrafo actual."""
+        if not self._pending_tables or not self._document:
+            logger.debug(f"No hay tablas pendientes o documento: tables={len(self._pending_tables) if self._pending_tables else 0}, doc={self._document is not None}")
+            return
+        
+        try:
+            para_element = self._current_paragraph._element
+            
+            for table_data in self._pending_tables:
+                rows_data = table_data['rows']
+                if not rows_data:
+                    continue
+                
+                num_rows = len(rows_data)
+                num_cols = max(len(row) for row in rows_data) if rows_data else 1
+                
+                logger.info(f"Creando tabla nativa de Word: {num_rows} filas x {num_cols} columnas")
+                
+                table = self._document.add_table(rows=num_rows, cols=num_cols)
+                
+                try:
+                    table.style = 'Table Grid'
+                except KeyError:
+                    self._apply_table_borders(table)
+                
+                table.autofit = True
+                
+                # Llenar la tabla
+                for row_idx, row_data in enumerate(rows_data):
+                    for col_idx, cell_data in enumerate(row_data):
+                        if col_idx < num_cols:
+                            cell = table.rows[row_idx].cells[col_idx]
+                            cell.text = cell_data.get('text', '')
+                            
+                            if cell_data.get('bold') and cell.paragraphs:
+                                for run in cell.paragraphs[0].runs:
+                                    run.bold = True
+                
+                self._set_table_autofit(table, num_cols)
+                
+                table_element = table._tbl
+                para_element.addnext(table_element)
+                
+                logger.debug(f"Tabla insertada exitosamente: {num_rows}x{num_cols}")
+                
+                para_element = table_element
+                
+        except Exception as e:
+            logger.error(f"Error insertando tablas: {e}", exc_info=True)
+        
+        self._pending_tables = []
+    
+    def _set_table_autofit(self, table: Table, num_cols: int) -> None:
+        """Configura la tabla para que ajuste automáticamente al contenido."""
+        try:
+            tbl = table._tbl
+            tblPr = tbl.tblPr
+            if tblPr is None:
+                tblPr = OxmlElement('w:tblPr')
+                tbl.insert(0, tblPr)
+            
+            # Configurar ancho de tabla a 100%
+            tblW = tblPr.find(qn('w:tblW'))
+            if tblW is None:
+                tblW = OxmlElement('w:tblW')
+                tblPr.append(tblW)
+            tblW.set(qn('w:type'), 'pct')
+            tblW.set(qn('w:w'), str(TABLE_WIDTH_PCT))
+            
+            # Configurar autofit
+            tblLayout = tblPr.find(qn('w:tblLayout'))
+            if tblLayout is None:
+                tblLayout = OxmlElement('w:tblLayout')
+                tblPr.append(tblLayout)
+            tblLayout.set(qn('w:type'), 'autofit')
+            
+            col_width_pct = TABLE_WIDTH_PCT // num_cols
+            
+            for row in table.rows:
+                for cell in row.cells:
+                    tcPr = cell._tc.tcPr
+                    if tcPr is None:
+                        tcPr = OxmlElement('w:tcPr')
+                        cell._tc.insert(0, tcPr)
+                    
+                    tcW = tcPr.find(qn('w:tcW'))
+                    if tcW is None:
+                        tcW = OxmlElement('w:tcW')
+                        tcPr.append(tcW)
+                    tcW.set(qn('w:type'), 'pct')
+                    tcW.set(qn('w:w'), str(col_width_pct))
+                    
+                    noWrap = tcPr.find(qn('w:noWrap'))
+                    if noWrap is not None:
+                        tcPr.remove(noWrap)
+                    
+                    for para in cell.paragraphs:
+                        try:
+                            pPr = para._p.get_or_add_pPr()
+                            suppressAutoHyphens = pPr.find(qn('w:suppressAutoHyphens'))
+                            if suppressAutoHyphens is None:
+                                suppressAutoHyphens = OxmlElement('w:suppressAutoHyphens')
+                                pPr.append(suppressAutoHyphens)
+                            suppressAutoHyphens.set(qn('w:val'), '1')
+                        except Exception:
+                            pass
+            
+        except Exception as e:
+            logger.warning(f"No se pudo configurar ancho de tabla: {e}")
+    
+    def _apply_table_borders(self, table: Table) -> None:
+        """Aplica bordes a una tabla cuando el estilo 'Table Grid' no está disponible."""
+        try:
+            tbl = table._tbl
+            tblPr = tbl.tblPr if tbl.tblPr is not None else OxmlElement('w:tblPr')
+            
+            tblBorders = OxmlElement('w:tblBorders')
+            
+            for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+                border = OxmlElement(f'w:{border_name}')
+                border.set(qn('w:val'), 'single')
+                border.set(qn('w:sz'), '4')
+                border.set(qn('w:space'), '0')
+                border.set(qn('w:color'), '000000')
+                tblBorders.append(border)
+            
+            tblPr.append(tblBorders)
+            if tbl.tblPr is None:
+                tbl.insert(0, tblPr)
+                
+        except Exception as e:
+            logger.warning(f"No se pudieron aplicar bordes a la tabla: {e}")
 
 
 # ============================================================================
 # FUNCIONES AUXILIARES
 # ============================================================================
 
-def convert_html_to_word_inline(html_content: str, paragraph, document=None) -> None:
-    """Función helper para convertir HTML a Word."""
+def convert_html_to_word_inline(
+    html_content: str, 
+    paragraph: Paragraph, 
+    document: Optional[Document] = None
+) -> None:
+    """
+    Función helper para convertir HTML a Word.
+    
+    Args:
+        html_content: Contenido HTML a convertir.
+        paragraph: Párrafo de destino.
+        document: Documento de Word.
+    """
     converter = HTMLToWordConverter()
     converter.convert_and_insert(html_content, paragraph, clear_paragraph=False, document=document)
 
 
 def strip_html_tags(html_content: str) -> str:
-    """Elimina tags HTML y devuelve solo el texto."""
+    """
+    Elimina tags HTML y devuelve solo el texto.
+    
+    Args:
+        html_content: Contenido HTML.
+    
+    Returns:
+        Texto sin tags HTML.
+    """
     if not html_content:
         return ''
     try:

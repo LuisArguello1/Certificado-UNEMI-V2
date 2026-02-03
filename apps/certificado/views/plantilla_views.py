@@ -75,6 +75,25 @@ class PlantillaCreateView(LoginRequiredMixin, BaseCatalogoMixin, CreateView):
     success_url = reverse_lazy('certificado:plantilla_list')
     titulo = 'Crear Nueva Plantilla'
     
+    def _get_direcciones_ocupadas(self) -> Dict[int, str]:
+        """
+        Obtiene un diccionario de direcciones que ya tienen plantillas asignadas.
+        
+        Returns:
+            Dict con {direccion_id: nombre_plantilla}
+        """
+        plantillas_activas = PlantillaBase.objects.filter(
+            es_activa=True
+        ).select_related('direccion').values('direccion_id', 'nombre', 'direccion__nombre')
+        
+        return {
+            p['direccion_id']: {
+                'plantilla_nombre': p['nombre'],
+                'direccion_nombre': p['direccion__nombre']
+            }
+            for p in plantillas_activas
+        }
+    
     def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context['breadcrumbs'] = [
@@ -87,6 +106,9 @@ class PlantillaCreateView(LoginRequiredMixin, BaseCatalogoMixin, CreateView):
             context['variantes_formset'] = VariantePlantillaFormSet(self.request.POST, self.request.FILES)
         else:
             context['variantes_formset'] = VariantePlantillaFormSet()
+        
+        # Agregar información de direcciones ocupadas
+        context['direcciones_ocupadas'] = self._get_direcciones_ocupadas()
         
         return context
     
@@ -139,6 +161,30 @@ class PlantillaUpdateView(LoginRequiredMixin, BaseCatalogoMixin, UpdateView):
     template_name = 'certificado/plantilla/plantilla_form.html'
     success_url = reverse_lazy('certificado:plantilla_list')
     
+    def _get_direcciones_ocupadas(self) -> Dict[int, str]:
+        """
+        Obtiene un diccionario de direcciones que ya tienen plantillas asignadas.
+        
+        IMPORTANTE: Excluye la dirección de la plantilla actual para permitir 
+        mantener la misma dirección al editar.
+        
+        Returns:
+            Dict con {direccion_id: {'plantilla_nombre': str, 'direccion_nombre': str}}
+        """
+        plantillas_activas = PlantillaBase.objects.filter(
+            es_activa=True
+        ).exclude(
+            pk=self.object.pk  # Excluir la plantilla actual
+        ).select_related('direccion').values('direccion_id', 'nombre', 'direccion__nombre')
+        
+        return {
+            p['direccion_id']: {
+                'plantilla_nombre': p['nombre'],
+                'direccion_nombre': p['direccion__nombre']
+            }
+            for p in plantillas_activas
+        }
+    
     def get_context_data(self, **kwargs) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'Editar: {self.object.nombre}'
@@ -156,6 +202,9 @@ class PlantillaUpdateView(LoginRequiredMixin, BaseCatalogoMixin, UpdateView):
             )
         else:
             context['variantes_formset'] = VariantePlantillaFormSet(instance=self.object)
+        
+        # Agregar información de direcciones ocupadas (excluyendo la actual)
+        context['direcciones_ocupadas'] = self._get_direcciones_ocupadas()
         
         return context
     
