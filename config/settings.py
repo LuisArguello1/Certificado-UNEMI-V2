@@ -156,22 +156,10 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static",]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Configuración de archivos de medios
-USE_NAS_STORAGE = env.bool('USE_NAS_STORAGE', default=False)
-MEDIA_ROOT_PATH = env('MEDIA_ROOT_PATH', default=os.path.join(BASE_DIR, 'media'))
-
-if USE_NAS_STORAGE:
-    # Usar ruta del NAS explícita
-    MEDIA_ROOT = MEDIA_ROOT_PATH
-    # Verificación de salud al inicio (solo log)
-    if not os.path.exists(MEDIA_ROOT) and not os.access(os.path.dirname(MEDIA_ROOT), os.W_OK):
-        print(f"[CRITICAL] USE_NAS_STORAGE=True pero la ruta '{MEDIA_ROOT}' no es accesible. Las cargas de archivos fallarán.")
-else:
-    # Usar almacenamiento local
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-    if not os.path.exists(MEDIA_ROOT):
-        os.makedirs(MEDIA_ROOT, exist_ok=True)
-    print(f"[INFO] Usando almacenamiento local: {MEDIA_ROOT}")
+# Configuración de archivos de medios (almacenamiento local)
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+if not os.path.exists(MEDIA_ROOT):
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 MEDIA_URL = '/media/'
 
@@ -186,20 +174,15 @@ LIBREOFFICE_PATH = r"C:\Program Files\LibreOffice\program\soffice.exe"
 CERTIFICADO_STORAGE_PATH = os.path.join(MEDIA_ROOT, 'certificados')
 CERTIFICADO_TEMPLATES_PATH = os.path.join(MEDIA_ROOT, 'plantillas_certificado')
 
-# Crear directorios si no existen (con manejo de errores para NAS offline)
-try:
-    os.makedirs(CERTIFICADO_STORAGE_PATH, exist_ok=True)
-    os.makedirs(CERTIFICADO_TEMPLATES_PATH, exist_ok=True)
-except Exception as e:
-    print(f"[ERROR] No se pudieron crear los directorios de certificados: {e}")
-    print("[WARNING] El sistema continuará funcionando, pero las operaciones de archivos fallarán hasta que el almacenamiento esté disponible.")
+# Crear directorios si no existen
+os.makedirs(CERTIFICADO_STORAGE_PATH, exist_ok=True)
+os.makedirs(CERTIFICADO_TEMPLATES_PATH, exist_ok=True)
 
 # Configuración de cache para archivos estáticos y media
-STATIC_FILE_MAX_AGE = 60 * 60 * 24 * 30  # 30 días en segundos
-MEDIA_FILE_MAX_AGE = 60 * 60 * 24 * 7    # 7 días en segundos
+STATIC_FILE_MAX_AGE = 60 * 60 * 24 * 30  
+MEDIA_FILE_MAX_AGE = 60 * 60 * 24 * 7    
 
 #Npm configuracion para Tailwind
-# Intentar obtener de variable de entorno, sino buscar en PATH, sino default 'npm'
 import shutil
 NPM_BIN_PATH = env('NPM_BIN_PATH', default=shutil.which('npm') or 'npm')
 
@@ -291,7 +274,7 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 
 # URL de conexión a Redis
 CELERY_BROKER_URL = env('REDIS_URL', default='redis://127.0.0.1:6379/0')
-CELERY_RESULT_BACKEND = 'django-db'  # Guardar resultados en BD Django
+CELERY_RESULT_BACKEND = 'django-db'  
 
 # Configuración adicional de Celery
 CELERY_ACCEPT_CONTENT = ['json']

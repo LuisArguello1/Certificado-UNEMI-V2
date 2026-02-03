@@ -253,6 +253,17 @@
 
 {% endblock %}
 
+{% block extra_css %}
+<!-- CKEditor 5 Estilos personalizados -->
+<link rel="stylesheet" href="{% static 'css/ckeditor.css' %}">
+{% endblock %}
+
 {% block extra_js %}
+<!-- CKEditor 5 Super Build (incluye Alignment, Indent, etc.) -->
+<script src="https://cdn.ckeditor.com/ckeditor5/40.2.0/super-build/ckeditor.js"></script>
+<script src="https://cdn.ckeditor.com/ckeditor5/40.2.0/super-build/translations/es.js"></script>
+
+<!-- Scripts del formulario -->
 <script src="{% static 'js/certificado/certificado_form.js' %}"></script>
+<script src="{% static 'js/certificado/ckeditor_init.js' %}"></script>
 {% endblock %}

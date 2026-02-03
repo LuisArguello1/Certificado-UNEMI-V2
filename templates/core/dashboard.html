@@ -13,29 +13,7 @@
             <p class="text-sm text-slate-500">Resumen general del sistema de certificados</p>
         </div>
 
-        <!-- SECCIÓN 0: Alerta de Almacenamiento NAS -->
-        {% if not storage_status.is_online %}
-        <div class="bg-white border-l-4 border-red-500 rounded-lg shadow-sm p-5 mb-6 animate-pulse">
-            <div class="flex items-start gap-4">
-                <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-server text-red-600 text-lg"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-2">
-                        <h3 class="text-sm font-bold text-red-800 uppercase tracking-wide">Alerta Técnica</h3>
-                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">NAS Desconectado</span>
-                    </div>
-                    <div class="space-y-2 text-sm text-red-700">
-                        <p><span class="font-semibold">Error:</span> {{ storage_status.message }}</p>
-                        <p><span class="font-semibold">Impacto:</span> No se pueden generar certificados, subir plantillas ni procesar archivos Excel.</p>
-                        <p><span class="font-semibold">Acción:</span> Verifique la conexión de red con el NAS Synology.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- SECCIÓN 0.5: Estado del Límite Diario de Correos -->
+        <!-- Estado del Límite Diario de Correos -->
         <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 mb-6">
             <div class="flex items-center justify-between flex-wrap gap-6">
                 <div class="flex items-start gap-4">

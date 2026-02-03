@@ -121,26 +121,6 @@
         </ul>
     </nav>
 
-    <!-- NAS Health Section -->
-    <div class="px-3 py-3 border-t border-gray-800 bg-gray-900/40">
-        <div class="flex items-center justify-between mb-1">
-            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Almacenamiento NAS</span>
-            <div class="flex items-center gap-1.5">
-                {% if storage_status.is_online %}
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
-                <span class="text-[10px] text-green-500 font-bold">ONLINE</span>
-                {% else %}
-                <span
-                    class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_5px_rgba(239,68,68,0.5)]"></span>
-                <span class="text-[10px] text-red-500 font-bold italic">OFFLINE</span>
-                {% endif %}
-            </div>
-        </div>
-        <p class="text-[9px] text-gray-500 leading-tight truncate" title="{{ storage_status.message }}">
-            {{ storage_status.message }}
-        </p>
-    </div>
-
     <!-- Footer del sidebar -->
     <div class="border-t border-gray-800 p-3 bg-gray-800/50 shrink-0">
         {% if user.is_authenticated %}
