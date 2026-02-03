@@ -401,10 +401,21 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
             return JsonResponse({'success': False, 'error': str(e)})
 
     def _handle_get_progress(self, request):
+        """
+        Obtiene el progreso actual del procesamiento.
+        
+        OPTIMIZACIÓN: Incluye un hash del estado para permitir al cliente
+        detectar si hubo cambios reales y evitar procesamiento innecesario.
+        """
         lote = ProcesamientoLote.objects.filter(evento=self.object).first()
         if not lote:
             return JsonResponse({'success': False, 'error': 'No hay procesamiento activo'})
-            
+        
+        # Generar hash del estado actual para detección de cambios
+        import hashlib
+        state_str = f"{lote.procesados}-{lote.exitosos}-{lote.fallidos}-{lote.estado}"
+        state_hash = hashlib.md5(state_str.encode()).hexdigest()
+        
         return JsonResponse({
             'success': True,
             'progress': lote.porcentaje_progreso,
@@ -412,7 +423,10 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
             'exitosos': lote.exitosos,
             'fallidos': lote.fallidos,
             'total': lote.total_estudiantes,
-            'is_complete': lote.estado in ['completed', 'partial', 'failed']
+            'is_complete': lote.estado in ['completed', 'partial', 'failed'],
+            # Nuevos campos para optimización de polling
+            'state_hash': state_hash,
+            'last_updated': lote.updated_at.isoformat()
         })
 
     def download_zip(self):

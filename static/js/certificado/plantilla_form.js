@@ -289,26 +289,83 @@ document.addEventListener('DOMContentLoaded', function () {
 
         direccionesGrid.innerHTML = `
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                ${direccionesData.map(dir => `
-                    <button type="button" class="direccion-card text-left p-4 border-2 border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all ${!dir.activo ? 'opacity-50' : ''}" data-id="${dir.id}" data-nombre="${dir.nombre}" data-codigo="${dir.codigo}">
+                ${direccionesData.map(dir => {
+                    const isOccupied = dir.has_template;
+                    const isDisabled = isOccupied || !dir.activo;
+                    
+                    return `
+                    <button type="button" 
+                        class="direccion-card text-left p-4 border-2 rounded-lg transition-all
+                            ${isDisabled ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60' : 'border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 cursor-pointer'}
+                            ${isOccupied ? 'relative' : ''}"
+                        data-id="${dir.id}" 
+                        data-nombre="${dir.nombre}" 
+                        data-codigo="${dir.codigo}"
+                        data-occupied="${isOccupied}"
+                        ${isDisabled ? 'disabled' : ''}>
+                        
+                        ${isOccupied ? `
+                        <div class="absolute top-2 right-2">
+                            <span class="inline-flex items-center px-2 py-1 text-[10px] font-bold bg-red-100 text-red-700 rounded-full">
+                                <i class="fas fa-ban mr-1"></i>
+                                YA EN USO
+                            </span>
+                        </div>
+                        ` : ''}
+                        
                         <div class="flex items-start">
-                            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
-                                <i class="fas fa-folder text-indigo-600 text-xl"></i>
+                            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br ${isOccupied ? 'from-gray-200 to-gray-300' : 'from-blue-100 to-indigo-100'} rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-folder ${isOccupied ? 'text-gray-400' : 'text-indigo-600'} text-xl"></i>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h3 class="text-sm font-bold text-gray-900 truncate">${dir.nombre}</h3>
+                                <h3 class="text-sm font-bold ${isOccupied ? 'text-gray-500' : 'text-gray-900'} truncate">${dir.nombre}</h3>
                                 <p class="text-xs text-gray-500 mt-0.5">Código: ${dir.codigo}</p>
-                                ${!dir.activo ? '<span class="inline-block mt-1 text-[9px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">INACTIVA</span>' : '<span class="inline-block mt-1 text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">ACTIVA</span>'}
+                                
+                                ${isOccupied ? `
+                                <div class="mt-2 pt-2 border-t border-gray-200">
+                                    <p class="text-[10px] text-gray-600">
+                                        <i class="fas fa-file-alt mr-1"></i>
+                                        Plantilla: <span class="font-bold">${dir.plantilla_nombre}</span>
+                                    </p>
+                                </div>
+                                ` : ''}
+                                
+                                ${!dir.activo && !isOccupied ? '<span class="inline-block mt-1 text-[9px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">INACTIVA</span>' : ''}
+                                ${dir.activo && !isOccupied ? '<span class="inline-block mt-1 text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">DISPONIBLE</span>' : ''}
                             </div>
                         </div>
                     </button>
-                `).join('')}
+                `}).join('')}
             </div>
         `;
 
         // Event listeners para cada card
         document.querySelectorAll('.direccion-card').forEach(card => {
             card.addEventListener('click', function () {
+                // Prevenir selección si está ocupada
+                if (this.dataset.occupied === 'true') {
+                    // Mostrar mensaje de error
+                    const mensaje = document.createElement('div');
+                    mensaje.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-[100] flex items-center animate-fade-in';
+                    mensaje.innerHTML = `
+                        <i class="fas fa-exclamation-circle mr-2 text-xl"></i>
+                        <div>
+                            <p class="font-bold">Dirección no disponible</p>
+                            <p class="text-sm text-red-100">Esta dirección ya tiene una plantilla asignada</p>
+                        </div>
+                    `;
+                    document.body.appendChild(mensaje);
+                    
+                    // Remover mensaje después de 3 segundos
+                    setTimeout(() => {
+                        mensaje.style.opacity = '0';
+                        mensaje.style.transition = 'opacity 0.3s';
+                        setTimeout(() => mensaje.remove(), 300);
+                    }, 3000);
+                    
+                    return;
+                }
+                
                 const id = this.dataset.id;
                 const nombre = this.dataset.nombre;
                 const codigo = this.dataset.codigo;

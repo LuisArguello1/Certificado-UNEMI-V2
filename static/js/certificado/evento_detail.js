@@ -6,6 +6,11 @@
 // Variables globales (csrftoken se define en el template)
 let pollInterval = null;
 
+// Variables para polling inteligente (optimización)
+let lastStateHash = null;
+let noChangeCount = 0;
+let currentPollInterval = 1000;
+
 // Estado para modales Alpine
 const modalState = {
     editModal: {
@@ -319,10 +324,17 @@ function startGeneration() {
 
 /**
  * Inicia el polling para monitorear el progreso
+ * OPTIMIZADO: Implementa backoff adaptativo y detección de cambios
+ * 
  * @param {string} actionType - Tipo de acción: 'GENERATE' o 'SEND'
  */
 function startPolling(actionType = 'GENERATE') {
     if (pollInterval) clearInterval(pollInterval);
+
+    // Reiniciar estado del polling inteligente
+    lastStateHash = null;
+    noChangeCount = 0;
+    currentPollInterval = 1000;
 
     // Mensajes según el tipo de acción
     const messages = {
@@ -348,32 +360,47 @@ function startPolling(actionType = 'GENERATE') {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    const progress = data.progress || 0;
+                    // OPTIMIZACIÓN: Detectar si hubo cambios usando hash
+                    const hasChanged = lastStateHash !== data.state_hash;
 
-                    // Actualizar barra de progreso en la página
-                    const progressBar = document.getElementById('progressBar');
-                    const progressPercent = document.getElementById('progressPercent');
-                    const countSuccess = document.getElementById('countSuccess');
-                    const countFailed = document.getElementById('countFailed');
+                    if (hasChanged) {
+                        // HAY CAMBIOS: resetear contador y mantener intervalo rápido
+                        noChangeCount = 0;
+                        const previousInterval = currentPollInterval;
+                        currentPollInterval = 1000;
 
-                    if (progressBar) progressBar.style.width = progress + '%';
-                    if (progressPercent) progressPercent.textContent = progress + '%';
-                    if (countSuccess) countSuccess.textContent = data.exitosos;
-                    if (countFailed) countFailed.textContent = data.fallidos;
+                        // Actualizar UI solo cuando hay cambios
+                        updateProgressUI(data, currentMessages, actionType);
 
-                    // Actualizar loading overlay si está activo
-                    if (window.loadingOverlay) {
-                        // Si el overlay está oculto pero estamos procesando, mostrarlo (caso recarga de página)
-                        if (data.status === 'processing' && window.loadingOverlay.overlay.classList.contains('hidden')) {
-                            window.loadingOverlay.show(`${currentMessages.processing}...`, actionType);
+                        // Guardar nuevo hash
+                        lastStateHash = data.state_hash;
+
+                        // Si cambiamos el intervalo, reiniciar polling
+                        if (previousInterval !== currentPollInterval) {
+                            clearInterval(pollInterval);
+                            pollInterval = setInterval(checkProgress, currentPollInterval);
+                        }
+                    } else {
+                        // NO HAY CAMBIOS: incrementar intervalo (backoff adaptativo)
+                        noChangeCount++;
+
+                        let newInterval = currentPollInterval;
+
+                        // Backoff adaptativo
+                        if (noChangeCount >= 10) {
+                            newInterval = 5000;  // 5 segundos después de 10 intentos sin cambio
+                        } else if (noChangeCount >= 5) {
+                            newInterval = 3000;  // 3 segundos después de 5 intentos
+                        } else if (noChangeCount >= 3) {
+                            newInterval = 2000;  // 2 segundos después de 3 intentos
                         }
 
-                        // Actualizar mensaje con progreso si está visible
-                        if (!window.loadingOverlay.overlay.classList.contains('hidden')) {
-                            window.loadingOverlay.updateMessage(
-                                `${currentMessages.processing}: ${data.exitosos} de ${data.total} completados (${progress}%)`
-                            );
-                            window.loadingOverlay.updateProgress(progress, data.exitosos, data.fallidos);
+                        // Si el intervalo cambió, reiniciar polling con nuevo intervalo
+                        if (newInterval !== currentPollInterval) {
+                            currentPollInterval = newInterval;
+                            clearInterval(pollInterval);
+                            pollInterval = setInterval(checkProgress, currentPollInterval);
+                            console.log(`[Polling] Sin cambios detectados. Intervalo ajustado a ${currentPollInterval}ms`);
                         }
                     }
 
@@ -397,8 +424,43 @@ function startPolling(actionType = 'GENERATE') {
     // Ejecutar inmediatamente la primera vez
     checkProgress();
 
-    // Luego continuar con intervalo de 1 segundo
-    pollInterval = setInterval(checkProgress, 1000);
+    // Luego continuar con intervalo inicial de 1 segundo
+    pollInterval = setInterval(checkProgress, currentPollInterval);
+}
+
+/**
+ * Actualiza la UI con el progreso actual
+ * Función helper extraída para evitar duplicación de código
+ */
+function updateProgressUI(data, messages, actionType) {
+    const progress = data.progress || 0;
+
+    // Actualizar barra de progreso en la página
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const countSuccess = document.getElementById('countSuccess');
+    const countFailed = document.getElementById('countFailed');
+
+    if (progressBar) progressBar.style.width = progress + '%';
+    if (progressPercent) progressPercent.textContent = progress + '%';
+    if (countSuccess) countSuccess.textContent = data.exitosos;
+    if (countFailed) countFailed.textContent = data.fallidos;
+
+    // Actualizar loading overlay si está activo
+    if (window.loadingOverlay) {
+        // Si el overlay está oculto pero estamos procesando, mostrarlo (caso recarga de página)
+        if (data.status === 'processing' && window.loadingOverlay.overlay.classList.contains('hidden')) {
+            window.loadingOverlay.show(`${messages.processing}...`, actionType);
+        }
+
+        // Actualizar mensaje con progreso si está visible
+        if (!window.loadingOverlay.overlay.classList.contains('hidden')) {
+            window.loadingOverlay.updateMessage(
+                `${messages.processing}: ${data.exitosos} de ${data.total} completados (${progress}%)`
+            );
+            window.loadingOverlay.updateProgress(progress, data.exitosos, data.fallidos);
+        }
+    }
 }
 
 /**

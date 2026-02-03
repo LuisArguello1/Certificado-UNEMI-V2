@@ -179,7 +179,7 @@ class PDFConversionService:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             
-            logger.info(f"Iniciando conversión batch de {len(valid_paths)} archivos...")
+            logger.debug(f"Iniciando conversión batch de {len(valid_paths)} archivos...")
             
             # Timeout dinámico: 15s base + 3s por archivo adicional
             timeout = 15 + (3 * len(valid_paths))

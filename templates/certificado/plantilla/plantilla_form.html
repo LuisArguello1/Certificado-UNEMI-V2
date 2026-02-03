@@ -1,6 +1,7 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
 {% load widget_tweaks %}
+{% load certificado_tags %}
 
 {% block title %}{% if object %}Editar{% else %}Crear{% endif %} Plantilla{% endblock %}
 
@@ -248,7 +249,16 @@ window.DIRECCIONES_DATA = [
         id: {{ dir.pk }},
         nombre: "{{ dir.nombre|escapejs }}",
         codigo: "{{ dir.codigo|escapejs }}",
-        activo: {{ dir.activo|lower }}
+        activo: {{ dir.activo|lower }},
+        // Información de plantilla asignada (si existe)
+        has_template: {% if dir.pk in direcciones_ocupadas.keys %}true{% else %}false{% endif %},
+        {% if dir.pk in direcciones_ocupadas.keys %}
+        plantilla_nombre: "{{ direcciones_ocupadas|get_item:dir.pk|get_item:'plantilla_nombre'|escapejs }}",
+        direccion_nombre: "{{ direcciones_ocupadas|get_item:dir.pk|get_item:'direccion_nombre'|escapejs }}"
+        {% else %}
+        plantilla_nombre: null,
+        direccion_nombre: null
+        {% endif %}
     }{% if not forloop.last %},{% endif %}
     {% endfor %}
 ];

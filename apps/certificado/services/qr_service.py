@@ -101,7 +101,7 @@ class QRService:
             # 6. Reemplazo atómico
             shutil.move(temp_output, pdf_path)
             
-            logger.info(f"QR estampado exitosamente en pagina 1 de: {pdf_path}")
+            logger.debug(f"QR estampado exitosamente en pagina 1 de: {pdf_path}")
             return True
             
         except Exception as e:

@@ -70,7 +70,7 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
     
     Esto reduce drásticamente el tiempo de startup de LibreOffice (4s -> 0.2s/cert).
     """
-    logger.info(f"Iniciando batch task para {len(certificado_ids)} certificados")
+    logger.debug(f"Iniciando batch task para {len(certificado_ids)} certificados")
     
     certificados = Certificado.objects.select_related(
         'estudiante', 'estudiante__evento', 'estudiante__evento__direccion'
