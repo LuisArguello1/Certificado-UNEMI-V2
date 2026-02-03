@@ -35,12 +35,20 @@ class CertificadoPostProcessor:
             variables: Diccionario de variables usadas en el reemplazo.
         """
         objetivo_value = variables.get('OBJETIVO DEL PROGRAMA', '') or variables.get('OBJETIVO_PROGRAMA', '')
+        contenido_value = variables.get('CONTENIDO', '') or variables.get('CONTENIDO_PROGRAMA', '')
         nombres_value = variables.get('NOMBRES', '')
 
-        def process_container(paragraphs: List[Paragraph]):
+        def process_main_body(paragraphs: List[Paragraph]):
+            """Procesa solo el cuerpo principal del certificado (primera página)."""
             for i, paragraph in enumerate(paragraphs):
                 text = paragraph.text.strip()
                 if not text:
+                    continue
+
+                # Excluir párrafos que contienen OBJETIVO o CONTENIDO (están en tablas/otra sección)
+                if objetivo_value and len(objetivo_value) > 20 and objetivo_value[:30] in text:
+                    continue
+                if contenido_value and len(contenido_value) > 20 and contenido_value[:30] in text:
                     continue
 
                 # 1. Aplicar sangrías al bloque principal del certificado
@@ -51,16 +59,7 @@ class CertificadoPostProcessor:
                     except Exception as e:
                         logger.warning(f"No se pudo aplicar sangría en párrafo '{text[:20]}...': {e}")
 
-                # 2. Ajustar interlineado del objetivo
-                if objetivo_value and objetivo_value[:50] in text:
-                    try:
-                        paragraph.paragraph_format.line_spacing = Pt(8)
-                        paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
-                        paragraph.paragraph_format.space_after = Pt(0)
-                    except Exception as e:
-                        logger.warning(f"No se pudo ajustar interlineado del objetivo: {e}")
-
-                # 3. Formato especial para el nombre del estudiante
+                # 2. Formato especial para el nombre del estudiante
                 if nombres_value and nombres_value in text and len(text) < 100:
                     try:
                         paragraph.paragraph_format.space_before = Pt(24)
@@ -70,14 +69,9 @@ class CertificadoPostProcessor:
                     except Exception as e:
                         logger.warning(f"No se pudo aplicar formato al nombre: {e}")
 
-        # Procesar items principales
-        process_container(doc.paragraphs)
-
-        # Procesar tablas recursivamente
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    process_container(cell.paragraphs)
+        # SOLO procesar el cuerpo principal del documento (NO las tablas)
+        # Las tablas contienen OBJETIVO y CONTENIDO que no deben tener sangrías
+        process_main_body(doc.paragraphs)
 
     @staticmethod
     def _is_certificate_body(text: str, index: int, paragraphs: List[Paragraph]) -> bool:

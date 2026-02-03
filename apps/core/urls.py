@@ -8,6 +8,6 @@ from . import views
 app_name = 'core'
 
 urlpatterns = [
-    path('', views.HomeView.as_view(), name='home'),
-    path('gestion-interna/', views.DashboardView.as_view(), name='dashboard'),
+    # path('', views.HomeView.as_view(), name='home'),
+    path('', views.DashboardView.as_view(), name='dashboard'),
 ]
