@@ -25,9 +25,15 @@
                     <a href="{% url 'certificado:modalidad_list' %}" class="inline-flex justify-center py-1.5 px-4 border border-gray-300 shadow-sm text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors uppercase">
                         CANCELAR
                     </a>
+                    {% if perms_u.can_modify %}
                     <button type="submit" class="inline-flex justify-center py-1.5 px-4 border border-transparent shadow-sm text-xs font-medium rounded-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-colors uppercase">
                         <i class="fas fa-save mr-2"></i> GUARDAR
                     </button>
+                    {% else %}
+                    <button type="button" disabled class="inline-flex justify-center py-1.5 px-4 border border-gray-300 shadow-sm text-xs font-medium rounded-sm text-gray-400 bg-gray-50 cursor-not-allowed uppercase">
+                        <i class="fas fa-lock mr-2"></i> SOLO LECTURA
+                    </button>
+                    {% endif %}
                 </div>
             </form>
         </div>

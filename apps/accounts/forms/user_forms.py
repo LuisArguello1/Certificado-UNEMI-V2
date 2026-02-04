@@ -1,7 +1,9 @@
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from apps.core.forms.base_form import BaseFormMixin
+
+User = get_user_model()
 
 class CustomUserCreationForm(BaseFormMixin, UserCreationForm):
     """
@@ -29,7 +31,8 @@ class CustomUserCreationForm(BaseFormMixin, UserCreationForm):
     
     class Meta:
         model = User
-        fields = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active')
+        fields = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active', 
+                 'is_only_read', 'can_modify', 'can_delete', 'can_send_email')
 
 class CustomUserChangeForm(BaseFormMixin, UserChangeForm):
     """
@@ -40,4 +43,5 @@ class CustomUserChangeForm(BaseFormMixin, UserChangeForm):
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active')
+        fields = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active',
+                 'is_only_read', 'can_modify', 'can_delete', 'can_send_email')

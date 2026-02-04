@@ -142,11 +142,13 @@
                 <i class="fas fa-building mr-2 text-gray-500"></i> Direcciones/Gestiones
             </h1>
         </div>
+        {% if perms_u.can_modify %}
         <div class="w-full sm:w-auto">
             <button @click="openCreateModal('{% url 'certificado:direccion_create' %}')" class="w-full sm:w-auto inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none shadow-sm transition-colors">
                 <i class="fas fa-plus mr-1"></i> NUEVA DIRECCIÓN
             </button>
         </div>
+        {% endif %}
     </div>
 
     <!-- Data Table -->
@@ -202,8 +204,8 @@
                                         isActive = $event.detail.newState;
                                     }
                                 "
-                                class="inline-flex items-center cursor-pointer"
-                                @click="toggleActive()"
+                                class="inline-flex items-center {% if perms_u.can_modify %}cursor-pointer{% else %}cursor-not-allowed opacity-75{% endif %}"
+                                @click="{% if perms_u.can_modify %}toggleActive(){% else %}Swal.fire('Acceso Denegado', 'No tiene permisos para modificar estados.', 'warning'){% endif %}"
                                 >
                                 <span 
                                     :class="isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
@@ -221,12 +223,16 @@
                             <a href="{% url 'certificado:direccion_detail' item.pk %}" class="text-blue-600 hover:text-blue-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 mb-0.5 inline-block" title="Ver Plantillas">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            {% if perms_u.can_modify %}
                             <button @click="openEditModal('{% url 'certificado:direccion_edit' item.pk %}')" class="text-indigo-600 hover:text-indigo-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 mb-0.5 inline-block">
                                 <i class="fas fa-edit"></i>
                             </button>
+                            {% endif %}
+                            {% if perms_u.can_delete %}
                             <button @click="showDeleteModal = true; deleteUrl = '{% url 'certificado:direccion_delete' item.pk %}'; deleteName = '{{ item.nombre }}'" class="text-red-600 hover:text-red-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 mb-0.5 inline-block">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -295,9 +301,11 @@
                         <div id="create-form-container"></div>
                         <div class="pt-4 border-t border-gray-100 flex justify-end space-x-2">
                             <button type="button" @click="showCreateModal = false" class="px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">Cancelar</button>
+                            {% if perms_u.can_modify %}
                             <button type="submit" class="px-3 py-1.5 border border-transparent text-xs font-medium rounded-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase">
                                 <i class="fas fa-save mr-1"></i> Guardar
                             </button>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -333,7 +341,9 @@
                         </div>
                         <div class="pt-4 border-t border-gray-100 flex justify-end space-x-2">
                             <button type="button" @click="showEditModal = false" class="px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">Cancelar</button>
+                            {% if perms_u.can_modify %}
                             <button type="submit" class="px-3 py-1.5 border border-transparent text-xs font-medium rounded-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors uppercase">Guardar Cambios</button>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -429,6 +439,7 @@
                                 class="flex-1 px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase disabled:opacity-50">
                             Cancelar
                         </button>
+                        {% if perms_u.can_modify %}
                         <button type="button" 
                                 @click="confirmToggle()"
                                 :disabled="toggleProcessing"
@@ -436,6 +447,7 @@
                                 class="flex-1 px-3 py-1.5 border border-transparent text-xs font-medium rounded-sm text-white transition-colors uppercase shadow-sm disabled:opacity-50">
                             Confirmar
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -464,7 +476,9 @@
                         {% csrf_token %}
                         <div class="flex space-x-3">
                             <button type="button" @click="showDeleteModal = false" class="flex-1 px-4 py-2 border border-gray-300 text-xs font-medium rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase">Abortar</button>
+                            {% if perms_u.can_delete %}
                             <button type="submit" class="flex-1 px-4 py-2 border border-transparent text-xs font-medium rounded-sm text-white bg-red-600 hover:bg-red-700 transition-colors uppercase shadow-sm">Sí, Eliminar</button>
+                            {% endif %}
                         </div>
                     </form>
                 </div>

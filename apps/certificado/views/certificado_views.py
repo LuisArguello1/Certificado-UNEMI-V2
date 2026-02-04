@@ -7,7 +7,8 @@ import logging
 import io
 import zipfile
 import os 
-
+from django.utils import timezone
+from django.db.models import Q
 from django.views.generic import TemplateView, DetailView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, get_object_or_404
@@ -22,8 +23,6 @@ from ..services import CertificadoService
 from ..utils import parse_excel_estudiantes
 from ..tasks import generate_certificate_task
 from .catalogo_views import BaseCatalogoMixin
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +162,7 @@ class CertificadoListView(LoginRequiredMixin, BaseCatalogoMixin, ListView):
     def get_queryset(self):
         from django.db.models import Count
         qs = super().get_queryset().select_related(
-            'direccion', 'modalidad'
+            'direccion', 'modalidad', 'tipo', 'tipo_evento', 'created_by'
         ).annotate(
             num_estudiantes=Count('estudiantes')
         ).order_by('-created_at')
@@ -192,10 +191,23 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         # Estudiantes con sus certificados (si existen)
         from django.core.paginator import Paginator
         
-        # Estudiantes con sus certificados (si existen)
-        estudiantes_qs = Estudiante.objects.filter(
-            evento=self.object
-        ).prefetch_related('certificados').order_by('nombres_completos')
+        # Filtros y Ordenamiento Global
+        q = self.request.GET.get('q', '').strip()
+        sort = self.request.GET.get('sort', 'asc')
+        
+        # Filtros
+        estudiantes_qs = Estudiante.objects.filter(evento=self.object).prefetch_related('certificados')
+        if q:
+            estudiantes_qs = estudiantes_qs.filter(
+                Q(nombres_completos__icontains=q) | 
+                Q(correo_electronico__icontains=q)
+            )
+            
+        # Ordenamiento
+        if sort == 'desc':
+            estudiantes_qs = estudiantes_qs.order_by('-nombres_completos')
+        else:
+            estudiantes_qs = estudiantes_qs.order_by('nombres_completos')
         
         # Paginación (20 por página para mejorar performance)
         page_number = self.request.GET.get('page')
@@ -203,23 +215,22 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         estudiantes_page = paginator.get_page(page_number)
         
         context['estudiantes'] = estudiantes_page
+        context['query'] = q
+        context['sort'] = sort
         
         # Procesamiento actual
         context['lote'] = ProcesamientoLote.objects.filter(evento=self.object).first()
         
-        # Estadísticas basadas en certificados
-        certificados_qs = Certificado.objects.filter(estudiante__evento=self.object)
-        total_estudiantes = estudiantes_qs.count()
-        enviados = certificados_qs.filter(estado='sent').count()
-        exitosos = certificados_qs.filter(estado__in=['sent', 'completed']).count()
-        fallidos = certificados_qs.filter(estado='failed').count()
+        # Estadísticas basadas en certificados (OPTIMIZADO: Una sola consulta)
+        from django.db.models import Count
+        stats = Certificado.objects.filter(estudiante__evento=self.object).aggregate(
+            total=Count('id'),
+            enviados=Count('id', filter=Q(estado='sent')),
+            exitosos=Count('id', filter=Q(estado__in=['sent', 'completed'])),
+            fallidos=Count('id', filter=Q(estado='failed'))
+        )
         
-        context['stats'] = {
-            'total': total_estudiantes,
-            'enviados': enviados,
-            'exitosos': exitosos,
-            'fallidos': fallidos
-        }
+        context['stats'] = stats
         
         return context
 
@@ -246,7 +257,8 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
             'get_certificate_status': self._handle_get_status,
             'toggle_qr': self._handle_toggle_qr,
             'get_progress': self._handle_get_progress,
-            'delete_certificates': self._handle_delete_certificates
+            'delete_certificates': self._handle_delete_certificates,
+            'create_student': self._handle_create_student
         }
         
         handler = handlers.get(action)
@@ -305,6 +317,36 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         except Exception as e:
             logger.error(f"Error eliminando certificados del evento {self.object.id}: {e}", exc_info=True)
             return JsonResponse({'success': False, 'error': f'Error al eliminar: {str(e)}'}, status=500)
+
+    def _handle_create_student(self, request):
+        nombre = request.POST.get('nombre')
+        correo = request.POST.get('correo')
+        
+        if not nombre or not correo:
+            return JsonResponse({'success': False, 'error': 'Nombre y correo son requeridos'}, status=400)
+            
+        try:
+            # Verificar si ya existe un estudiante con ese correo en este evento
+            if Estudiante.objects.filter(evento=self.object, correo_electronico=correo).exists():
+                return JsonResponse({'success': False, 'error': 'Ya existe un estudiante con este correo en el evento'}, status=400)
+
+            estudiante = Estudiante.objects.create(
+                evento=self.object,
+                nombres_completos=nombre,
+                correo_electronico=correo
+            )
+            return JsonResponse({
+                'success': True, 
+                'message': 'Estudiante creado exitosamente',
+                'estudiante': {
+                    'id': estudiante.id,
+                    'nombre': estudiante.nombres_completos,
+                    'correo': estudiante.correo_electronico
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error creando estudiante: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': f'Error al crear: {str(e)}'}, status=500)
 
     def _handle_update_student(self, request):
         est_id = request.POST.get('estudiante_id')
@@ -431,7 +473,12 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
 
     def download_zip(self):
         evento = self.get_object()
-        certificados = Certificado.objects.filter(estudiante__evento=evento, estado='completed').exclude(archivo_pdf='')
+        # Optimizado con select_related para evitar N+1 al procesar nombres de estudiantes
+        # Incluye tanto 'completed' como 'sent' para permitir la descarga después del envío
+        certificados = Certificado.objects.filter(
+            estudiante__evento=evento, 
+            estado__in=['completed', 'sent']
+        ).select_related('estudiante').exclude(archivo_pdf='')
         
         if not certificados.exists():
             messages.warning(self.request, "No hay certificados generados para descargar.")

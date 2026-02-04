@@ -15,7 +15,7 @@ Arquitectura:
 """
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.utils import timezone
 from datetime import datetime
@@ -429,7 +429,7 @@ class Evento(models.Model):
         help_text='Si no se selecciona, se usa la plantilla base'
     )
     created_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name='Creado por'
@@ -812,6 +812,7 @@ class ProcesamientoLote(models.Model):
             fallidos=Count('id', filter=Q(estado='failed'))
         )
         
+        self.total_estudiantes = stats['total'] # Sincronizar total real (por si se borraron estudiantes)
         self.procesados = stats['completados'] + stats['fallidos']
         self.exitosos = stats['completados']
         self.fallidos = stats['fallidos']

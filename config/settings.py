@@ -136,6 +136,9 @@ LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'core:dashboard'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 
+# Modelo de usuario personalizado
+AUTH_USER_MODEL = 'accounts.User'
+
 # URL del sitio para QR
 SITE_URL = env('SITE_URL', default='http://localhost:8000')
 

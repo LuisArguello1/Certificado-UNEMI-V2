@@ -138,25 +138,29 @@ class EventoForm(CoreBaseForm):
         if 'direccion_gestion' in self.initial and self.initial['direccion_gestion']:
             try:
                 direccion_id = self.initial['direccion_gestion']
-                # Obtener plantilla base de esta dirección
+                # Obtener plantilla base activa de esta dirección
                 plantilla_base = PlantillaBase.objects.filter(
                     direccion_id=direccion_id,
                     es_activa=True
                 ).first()
                 
                 if plantilla_base:
-                    # Cargar variantes activas de esta plantilla
-                    self.fields['variante_plantilla'].queryset = VariantePlantilla.objects.filter(
+                    # Cargar variantes activas de esta plantilla (Optimizado con select_related)
+                    self.fields['plantilla_seleccionada'].queryset = VariantePlantilla.objects.filter(
                         plantilla_base=plantilla_base,
                         activo=True
-                    ).order_by('orden', 'nombre')
+                    ).select_related('plantilla_base').order_by('orden', 'nombre')
             except (ValueError, TypeError):
                 pass
-            self.fields['variante_plantilla'].queryset = VariantePlantilla.objects.filter(
-                plantilla_base__direccion=self.instance.direccion_gestion,
+        
+        # Si hay instancia (edición) - Verificación segura para evitar AttributeError en forms.Form
+        instance = getattr(self, 'instance', None)
+        if instance and instance.pk and hasattr(instance, 'direccion'):
+            self.fields['plantilla_seleccionada'].queryset = VariantePlantilla.objects.filter(
+                plantilla_base__direccion=instance.direccion,
                 plantilla_base__es_activa=True,
                 activo=True
-            ).select_related('plantilla_base')
+            ).select_related('plantilla_base').order_by('orden', 'nombre')
     
     def clean(self):
         """
