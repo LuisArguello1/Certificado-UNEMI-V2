@@ -43,6 +43,7 @@ THIRD_PARTY_APPS = [
     'widget_tweaks',
     'tailwind',
     'theme',
+    'axes',
 ]
 
 # Aplicaciones locales
@@ -69,6 +70,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 # Middleware solo para DEBUG, y no para produccion
@@ -124,11 +126,25 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # =============================================================================
+# SEGURIDAD - DJANGO AXES
+# =============================================================================
+from datetime import timedelta
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)   # Tiempo de bloqueo (15 minutos)
+AXES_RESET_ON_SUCCESS = True                # Reiniciar contador si el login es exitoso
+AXES_LOCKOUT_PARAMETERS = ["username"]      # Bloquear SOLO por usuario (no por IP para evitar bloqueos cruzados)
+AXES_LOCK_OUT_AT_FAILURE = True             # Bloquear inmediatamente al fallar el último intento
+AXES_LOCKOUT_TEMPLATE = 'accounts/login.html' # Usar la misma plantilla de login para el bloqueo
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False  # No extender el bloqueo con más intentos
+
+# =============================================================================
 # AUTENTICACIÓN
 # =============================================================================
 
 # Backends de autenticación
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
     'django.contrib.auth.backends.ModelBackend', 
 ]
 

@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
-    CustomLoginView, CustomLogoutView, UserListView, UserCreateView, 
-    UserUpdateView, UserDeleteView, UserToggleActiveView, UserPasswordChangeView
+    CustomLoginView, CustomLogoutView, UserListView, UserCreateView,
+    UserUpdateView, UserDeleteView, UserToggleActiveView, UserPasswordChangeView,
+    UserUnlockView
 )
 
 app_name = 'accounts'
@@ -17,6 +18,7 @@ urlpatterns = [
     path('users/<int:pk>/edit/', UserUpdateView.as_view(), name='user_update'),
     path('users/<int:pk>/delete/', UserDeleteView.as_view(), name='user_delete'),
     path('users/<int:pk>/toggle-active/', UserToggleActiveView.as_view(), name='user_toggle_active'),
+    path('users/<int:pk>/unlock/', UserUnlockView.as_view(), name='user_unlock'),
     path('users/<int:pk>/password-change/', UserPasswordChangeView.as_view(), name='user_password_change'),
 ]
 
