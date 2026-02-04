@@ -555,8 +555,6 @@ class HTMLToWordConverter:
                 num_rows = len(rows_data)
                 num_cols = max(len(row) for row in rows_data) if rows_data else 1
                 
-                logger.info(f"Creando tabla nativa de Word: {num_rows} filas x {num_cols} columnas")
-                
                 table = self._document.add_table(rows=num_rows, cols=num_cols)
                 
                 try:

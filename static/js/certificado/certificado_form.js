@@ -228,8 +228,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function selectPlantilla(item) {
         hiddenPlantillaInput.value = item.id;
         selectedPlantillaText.textContent = item.nombre.toUpperCase();
-        plantillaDisplayBox.classList.remove('opacity-60', 'bg-gray-50', 'border-dashed');
-        plantillaDisplayBox.classList.add('bg-white', 'border-gray-300', 'text-black');
+            plantillaDisplayBox.classList.remove('opacity-60', 'bg-gray-50', 'border-dashed');
+            plantillaDisplayBox.classList.add('bg-white', 'border-gray-300', 'text-black');
         const iconContainer = plantillaDisplayBox.querySelector('.w-8');
         iconContainer.className = 'w-8 h-8 rounded-sm bg-black text-white flex items-center justify-center mr-3 border border-black';
         closePlantillaModal();

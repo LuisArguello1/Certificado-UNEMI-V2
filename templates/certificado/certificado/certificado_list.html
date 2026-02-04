@@ -12,11 +12,13 @@
                 <i class="fas fa-certificate mr-2 text-gray-400"></i> Gestión de Certificados
             </h1>
         </div>
+        {% if perms_u.can_modify %}
         <div>
             <a href="{% url 'certificado:crear' %}" class="inline-flex items-center px-3 py-1.5 border border-transparent text-[10px] font-black rounded-sm text-white bg-black hover:bg-gray-800 shadow-sm transition-colors uppercase tracking-widest">
                 <i class="fas fa-plus mr-1.5"></i> NUEVO LOTE
             </a>
         </div>
+        {% endif %}
     </div>
 
     <!-- Filters (Clean style) -->
@@ -87,12 +89,14 @@
                         <td class="px-4 py-3 text-right">
                             <a href="{% url 'certificado:evento_detail' evento.pk %}" 
                                class="inline-flex items-center px-3 py-1.5 bg-white border border-gray-300 text-[10px] font-black text-gray-700 hover:text-black hover:border-black hover:bg-gray-50 transition-all uppercase tracking-widest rounded-sm shadow-sm">
-                                <i class="fas fa-cog mr-1.5 text-gray-400"></i> GESTIONAR
+                                <i class="fas fa-eye mr-1.5 text-gray-400"></i> GESTIONAR
                             </a>
+                            {% if perms_u.can_delete %}
                             <button onclick="confirmarEliminacion('{{ evento.pk }}', '{{ evento.nombre_evento|escapejs }}')" 
                                     class="inline-flex items-center px-3 py-1.5 bg-white border border-red-300 text-[10px] font-black text-red-600 hover:text-white hover:bg-red-600 hover:border-red-600 transition-all uppercase tracking-widest rounded-sm shadow-sm ml-2">
                                 <i class="fas fa-trash mr-1.5"></i> ELIMINAR
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                 {% empty %}
@@ -162,10 +166,17 @@
                             class="flex-1 px-4 py-2 border border-gray-300 text-xs font-bold rounded-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors uppercase tracking-widest">
                         Cancelar
                     </button>
+                    {% if perms_u.can_delete %}
                     <button type="submit" 
                             class="flex-1 px-4 py-2 border border-transparent text-xs font-bold rounded-sm text-white bg-red-600 hover:bg-red-700 transition-colors uppercase tracking-widest shadow-sm">
                         Sí, Eliminar
                     </button>
+                    {% else %}
+                    <button type="button" disabled
+                            class="flex-1 px-4 py-2 border border-gray-100 text-xs font-bold rounded-sm text-gray-300 bg-gray-50 cursor-not-allowed uppercase tracking-widest shadow-sm">
+                        <i class="fas fa-lock mr-2"></i> No Autorizado
+                    </button>
+                    {% endif %}
                 </div>
             </form>
         </div>

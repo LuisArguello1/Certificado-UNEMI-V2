@@ -10,7 +10,9 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from django.db import transaction
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 from ..models import Evento, Estudiante, Certificado, ProcesamientoLote, EmailDailyLimit
 from ..utils import parse_excel_estudiantes
@@ -128,23 +130,37 @@ class CertificadoService:
             if total == 0:
                 raise ValueError("El evento no tiene estudiantes registrados.")
 
-            # 1. Preparar registros de Certificado
-            certificado_ids = []
+            # 1. Preparar registros de Certificado (OPTIMIZADO: Batch)
+            # Obtener certificados existentes para este evento
+            existentes = {c.estudiante_id: c for c in Certificado.objects.filter(estudiante__evento=evento)}
             
-            # Usamos get_or_create para manejar reintentos sin duplicar
+            nuevos_certs = []
+            ids_para_reiniciar = []
+            
             for estudiante in estudiantes:
-                cert, created = Certificado.objects.get_or_create(
-                    estudiante=estudiante,
-                    defaults={'estado': 'pending'}
+                if estudiante.id not in existentes:
+                    nuevos_certs.append(Certificado(estudiante=estudiante, estado='pending'))
+                else:
+                    cert = existentes[estudiante.id]
+                    if cert.estado != 'pending':
+                        ids_para_reiniciar.append(cert.id)
+            
+            # Crear los que no existen
+            if nuevos_certs:
+                Certificado.objects.bulk_create(nuevos_certs)
+            
+            # Reiniciar los existentes que no están pendientes
+            if ids_para_reiniciar:
+                Certificado.objects.filter(id__in=ids_para_reiniciar).update(
+                    estado='pending', 
+                    error_mensaje='',
+                    updated_at=timezone.now()
                 )
-                
-                # Si ya existe (reintento), resetear a pending
-                if not created and cert.estado != 'pending':
-                    cert.estado = 'pending'
-                    cert.error_mensaje = ''
-                    cert.save(update_fields=['estado', 'error_mensaje'])
-                
-                certificado_ids.append(cert.id)
+            
+            # Obtener todos los IDs de certificados para encolar
+            certificado_ids = list(Certificado.objects.filter(
+                estudiante__evento=evento
+            ).values_list('id', flat=True))
 
             # 2. Encolar tareas en LOTES (Chunking) optimization
             BATCH_SIZE = 20
@@ -244,6 +260,11 @@ class CertificadoService:
             logger.info(f"Envío iniciado para evento {evento_id}. {count} correos encolados.")
             return count, "Envío masivo encolado exitosamente."
             
+        except ValueError as e:
+            # Errores de validación esperados (como límites) se registran como advertencia sin traceback
+            logger.warning(f"Validación de envío para evento {evento_id}: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Error iniciando envío para evento {evento_id}: {e}", exc_info=True)
+            # Errores críticos sí mantienen el traceback para depuración
+            logger.error(f"Error crítico iniciando envío para evento {evento_id}: {e}", exc_info=True)
             raise

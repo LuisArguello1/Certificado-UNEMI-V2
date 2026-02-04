@@ -24,6 +24,19 @@ class ValidacionCertificadoView(DetailView):
     def get_object(self, queryset=None) -> Certificado:
         """
         Recupera el certificado basado en el UUID de la URL.
-        Lanza 404 si no existe un certificado con ese UUID de validación.
+        Optimizado con select_related para cargar todos los datos del evento en una sola consulta.
         """
-        return get_object_or_404(Certificado, uuid_validacion=self.kwargs['uuid'])
+        if queryset is None:
+            queryset = self.get_queryset()
+            
+        return get_object_or_404(
+            queryset.select_related(
+                'estudiante', 
+                'estudiante__evento', 
+                'estudiante__evento__direccion',
+                'estudiante__evento__modalidad',
+                'estudiante__evento__tipo',
+                'estudiante__evento__tipo_evento'
+            ), 
+            uuid_validacion=self.kwargs['uuid']
+        )

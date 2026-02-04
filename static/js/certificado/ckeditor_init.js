@@ -113,7 +113,7 @@ const editorInstances = {};
 async function initCKEditor(selector, editorKey) {
     try {
         const element = document.querySelector(selector);
-        
+
         if (!element) {
             console.warn(`Elemento no encontrado: ${selector}`);
             return;
@@ -128,20 +128,21 @@ async function initCKEditor(selector, editorKey) {
         // Crear nueva instancia (Super Build usa CKEDITOR.ClassicEditor)
         const EditorClass = window.CKEDITOR?.ClassicEditor || window.ClassicEditor;
         const editor = await EditorClass.create(element, CKEDITOR_CONFIG);
-        
+
         // Guardar instancia
         editorInstances[editorKey] = editor;
-        
+
         // Configurar actualización automática del textarea original
         editor.model.document.on('change:data', () => {
             element.value = editor.getData();
         });
 
-        console.log(`CKEditor inicializado: ${editorKey}`);
+        // CKEditor inicializado correctamente
+
 
     } catch (error) {
         console.error(`Error inicializando CKEditor en ${selector}:`, error);
-        
+
         // Fallback: mostrar textarea normal
         const element = document.querySelector(selector);
         if (element) {
@@ -171,13 +172,14 @@ function cleanHTMLBeforeSubmit(form) {
 async function initAllEditors() {
     // Buscar todos los textareas con la clase 'ckeditor-target'
     const targets = document.querySelectorAll('textarea.ckeditor-target');
-    
+
     if (targets.length === 0) {
         console.info('No se encontraron campos para CKEditor');
         return;
     }
 
-    console.log(`Inicializando ${targets.length} editores CKEditor...`);
+    // Iniciando editores
+
 
     // Inicializar cada editor
     for (const target of targets) {

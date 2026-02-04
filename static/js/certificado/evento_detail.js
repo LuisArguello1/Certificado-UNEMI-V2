@@ -23,6 +23,11 @@ const modalState = {
         isOpen: false,
         estudianteId: null,
         nombre: ''
+    },
+    createModal: {
+        isOpen: false,
+        nombre: '',
+        correo: ''
     }
 };
 
@@ -119,6 +124,96 @@ function saveEditModal() {
         .catch(error => {
             console.error('Error:', error);
             showToast("ERROR AL GUARDAR CAMBIOS");
+        });
+}
+
+/**
+ * Abre el modal de creación de estudiante
+ */
+function openCreateModal() {
+    modalState.createModal.isOpen = true;
+
+    // Limpiar campos
+    const nombreInput = document.getElementById('createNombre');
+    const correoInput = document.getElementById('createCorreo');
+    if (nombreInput) nombreInput.value = '';
+    if (correoInput) correoInput.value = '';
+
+    // Mostrar modal
+    const modal = document.getElementById('createModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+/**
+ * Cierra el modal de creación
+ */
+function closeCreateModal() {
+    modalState.createModal.isOpen = false;
+    const modal = document.getElementById('createModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Guarda el nuevo estudiante
+ */
+function saveCreateModal() {
+    const nombreInput = document.getElementById('createNombre');
+    const correoInput = document.getElementById('createCorreo');
+
+    if (!nombreInput || !correoInput) return;
+
+    const nombre = nombreInput.value.trim();
+    const correo = correoInput.value.trim();
+
+    // Validación básica
+    if (!nombre || !correo) {
+        showToast("TODOS LOS CAMPOS SON REQUERIDOS");
+        return;
+    }
+
+    // Validación de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+        showToast("FORMATO DE CORREO INVÁLIDO");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'create_student');
+    formData.append('nombre', nombre);
+    formData.append('correo', correo);
+    formData.append('csrfmiddlewaretoken', csrftoken);
+
+    // Deshabilitar botón para evitar doble envío
+    const saveBtn = document.querySelector('#createModal button[onclick="saveCreateModal()"]');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GUARDANDO...';
+    }
+
+    fetch('', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message.toUpperCase());
+                closeCreateModal();
+                // Recargar para mostrar el nuevo estudiante
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showToast(data.error.toUpperCase());
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = 'GUARDAR';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast("ERROR AL CREAR ESTUDIANTE");
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = 'GUARDAR';
+            }
         });
 }
 
@@ -272,7 +367,7 @@ function startGeneration() {
     if (btn) {
         btn.disabled = true;
         btn.classList.add('opacity-50');
-        const icon = btn.querySelector('i');
+        const icon = btn.querySelector('.fa-sync-alt');
         if (icon) icon.classList.add('fa-spin');
     }
 
@@ -620,11 +715,148 @@ function confirmDeleteCertificates() {
         });
 }
 
-// Inicialización al cargar la página
+/**
+ * Abre el modal de eliminación de EVENTO completo
+ */
+function confirmarEliminacionEvento(eventoId, eventoNombre) {
+    const modal = document.getElementById('deleteEventModal');
+    const nameSpan = document.getElementById('eventoNombre');
+    const form = document.getElementById('deleteEventForm');
+
+    if (nameSpan) nameSpan.textContent = eventoNombre;
+    if (form) form.action = `/certificados/evento/${eventoId}/eliminar/`;
+    if (modal) modal.classList.remove('hidden');
+}
+
+/**
+ * Cierra el modal de eliminación de evento
+ */
+function cerrarModalEvento() {
+    const modal = document.getElementById('deleteEventModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Maneja el estado visual de carga de la nómina
+ * @param {boolean} isLoading - Si está cargando o no
+ */
+function setNominaLoading(isLoading) {
+    const container = document.getElementById('estudiantesTableContainer');
+    if (container) {
+        if (isLoading) {
+            container.classList.add('opacity-40', 'pointer-events-none', 'transition-opacity');
+        } else {
+            container.classList.remove('opacity-40', 'pointer-events-none');
+        }
+    }
+}
+
+/**
+ * Actualiza la nómina de estudiantes mediante AJAX (Global)
+ * @param {Object} params - Parámetros de búsqueda y orden
+ */
+function updateNomina(params) {
+    const url = new URL(window.location.href);
+
+    if (params.q !== undefined) {
+        url.searchParams.set('q', params.q);
+        url.searchParams.set('page', '1');
+    }
+    if (params.sort !== undefined) {
+        url.searchParams.set('sort', params.sort);
+    }
+
+    setNominaLoading(true);
+
+    fetch(url)
+        .then(res => res.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newContainer = doc.getElementById('estudiantesTableContainer');
+            const oldContainer = document.getElementById('estudiantesTableContainer');
+
+            if (newContainer && oldContainer) {
+                oldContainer.innerHTML = newContainer.innerHTML;
+                window.history.pushState({}, '', url);
+            }
+        })
+        .catch(err => {
+            console.error('Error al actualizar nómina:', err);
+            showToast("ERROR AL ACTUALIZAR LISTADO");
+        })
+        .finally(() => {
+            setNominaLoading(false);
+        });
+}
+
+/**
+ * Aplica el ordenamiento global (A-Z / Z-A)
+ * @param {string} direction - 'asc' o 'desc'
+ */
+window.aplicarOrdenamiento = function (direction) {
+    updateNomina({ sort: direction });
+}
+
+// Inicialización
 document.addEventListener('DOMContentLoaded', function () {
-    // Si hay un lote en proceso, iniciar polling automáticamente
     const progressSection = document.getElementById('progressSection');
     if (progressSection && !progressSection.classList.contains('hidden')) {
         startPolling();
+    }
+
+    const searchInput = document.getElementById('nominaSearch');
+    let searchTimeout = null;
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function (e) {
+            clearTimeout(searchTimeout);
+            const term = e.target.value.trim();
+
+            // Buscar solo si tiene 5+ caracteres o si el campo se vacía (reset)
+            if (term.length >= 5 || term.length === 0) {
+                searchTimeout = setTimeout(() => {
+                    updateNomina({ q: term });
+                }, 400);
+            }
+        });
+    }
+
+    // Manejar envío del formulario de eliminación de evento
+    const deleteForm = document.getElementById('deleteEventForm');
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> ELIMINANDO...';
+
+            fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast("EVENTO ELIMINADO");
+                        setTimeout(() => window.location.href = data.redirect_url || '/certificados/lista/', 1000);
+                    } else {
+                        showToast(data.error.toUpperCase());
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast("ERROR AL ELIMINAR EVENTO");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                });
+        });
     }
 });

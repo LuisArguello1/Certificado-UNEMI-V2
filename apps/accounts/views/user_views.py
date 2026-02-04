@@ -1,13 +1,16 @@
+from django.shortcuts import get_object_or_404
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.views import View
-from django.contrib.auth.models import User
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import SetPasswordForm
 from ..forms.user_forms import CustomUserCreationForm, CustomUserChangeForm
 import logging
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +127,36 @@ class UserToggleActiveView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 'success': False,
                 'error': 'Error al cambiar el estado del usuario.'
             }, status=500)
+
+class UserPasswordChangeView(LoginRequiredMixin, SuperUserRequiredMixin, UpdateView):
+    """
+    Vista AJAX para que un administrador cambie la contraseña de un usuario.
+    """
+    model = User
+    form_class = SetPasswordForm
+    template_name = 'accounts/partials/password_change_form.html'
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.object
+        # SetPasswordForm no recibe instance, solo user
+        if 'instance' in kwargs:
+            del kwargs['instance']
+        return kwargs
+
+    def form_valid(self, form):
+        form.save()
+        logger.info(f"Contraseña de usuario {self.object.username} cambiada por {self.request.user.username}")
+        return JsonResponse({
+            'success': True,
+            'message': f'Contraseña de {self.object.username} actualizada correctamente.'
+        })
+
+    def form_invalid(self, form):
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors.get_json_data()
+        }, status=400)
 
 class UserDeleteView(LoginRequiredMixin, SuperUserRequiredMixin, DeleteView):
     model = User

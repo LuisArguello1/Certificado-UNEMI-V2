@@ -12,7 +12,7 @@ from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Q, Count
 
 from apps.certificado.models import Direccion
 from apps.certificado.forms.direccion_form import DireccionForm
@@ -150,9 +150,12 @@ class DireccionDeleteView(LoginRequiredMixin, SafeDeleteMixin, BaseCatalogoMixin
             {'name': 'Direcciones', 'url': reverse('certificado:direccion_list')},
             {'name': 'Eliminar Dirección'}
         ]
-        # Información de impacto
-        context['num_plantillas'] = self.object.plantillas_base.count()
-        context['num_eventos'] = self.object.eventos.count()
+        # Información de impacto (OPTIMIZADO: Una sola consulta)
+        impacto = self.object.plantillas_base.aggregate(
+            num_plantillas=Count('id'),
+            num_eventos=Count('eventos')
+        )
+        context.update(impacto)
         return context
     
     def delete(self, request, *args, **kwargs):
