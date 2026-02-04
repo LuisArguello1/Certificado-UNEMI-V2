@@ -5,12 +5,17 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>UNEMI Login - Sistema de Gestión Académica</title>
+       <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/message.css' %}">
+
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="/static/icons/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
     <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -57,119 +62,126 @@
     </style>
 </head>
 <body>
-<div class="flex h-screen w-full overflow-hidden">
-    <!-- Left Panel (Brand) - Fixed Color #111827 -->
-    <div class="hidden lg:flex lg:w-1/2 xl:w-[45%] brand-bg flex-col justify-between p-12 text-white">
-        <!-- Logo Section -->
-        <div class="flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
-                <span class="material-symbols-outlined text-3xl">school</span>
-            </div>
-            <span class="text-xl font-bold tracking-wide">UNEMI</span>
-        </div>
-        
-        <!-- Welcome Content -->
-        <div class="flex flex-col gap-6">
-            <div class="hero-image" 
-                 style="background-image: url('{% static 'img/unemi_fondo_login.png' %}');">
-            </div>
-            <p class="max-w-md text-base font-normal text-gray-300">
-                Generación de Certificados.
-            </p>
-            <p class="text-sm font-medium text-blue-400">
-                Universidad Estatal de Milagro
-            </p>
-        </div>
-        
-        <!-- Footer -->
-        <div class="text-sm text-gray-500">
-            <p>© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
-        </div>
-    </div>
-    
-    <!-- Right Panel (Login Form) -->
-    <div class="flex w-full lg:w-1/2 xl:w-[55%] flex-col justify-center bg-gray-50 px-8 py-12 lg:px-16">
-        <!-- Mobile Logo -->
-        <div class="mb-8 flex items-center justify-center lg:hidden">
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg brand-bg text-white">
-                <span class="material-symbols-outlined text-3xl">school</span>
-            </div>
-        </div>
-        
-        <div class="mx-auto flex w-full max-w-[420px] flex-col gap-6">
-            <!-- Form Header -->
-            <div class="flex flex-col gap-2 text-center lg:text-left">
-                <h2 class="text-3xl font-bold text-gray-900">Iniciar Sesión</h2>
-                <p class="text-gray-600">Ingresa tus credenciales para acceder al sistema.</p>
+    <div class="flex h-screen w-full overflow-hidden">
+
+        <!-- Mensajes de Django -->
+        {% include 'fragments/alerts.html' %}
+
+        <!-- Left Panel (Brand) - Fixed Color #111827 -->
+        <div class="hidden lg:flex lg:w-1/2 xl:w-[45%] brand-bg flex-col justify-between p-12 text-white">
+            <!-- Logo Section -->
+            <div class="flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
+                    <span class="material-symbols-outlined text-3xl">school</span>
+                </div>
+                <span class="text-xl font-bold tracking-wide">UNEMI</span>
             </div>
             
-            <!-- Error Messages -->
-            {% if form.errors %}
-            <div class="rounded-md border border-red-300 bg-red-50 p-3.5 text-sm text-red-800">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-lg">error</span>
-                    <span class="font-medium">Credenciales inválidas. Verifica tus datos.</span>
+            <!-- Welcome Content -->
+            <div class="flex flex-col gap-6">
+                <div class="hero-image" 
+                    style="background-image: url('{% static 'img/unemi_fondo_login.png' %}');">
+                </div>
+                <p class="max-w-md text-base font-normal text-gray-300">
+                    Generación de Certificados.
+                </p>
+                <p class="text-sm font-medium text-blue-400">
+                    Universidad Estatal de Milagro
+                </p>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-sm text-gray-500">
+                <p>© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
+            </div>
+        </div>
+        
+        <!-- Right Panel (Login Form) -->
+        <div class="flex w-full lg:w-1/2 xl:w-[55%] flex-col justify-center bg-gray-50 px-8 py-12 lg:px-16">
+            <!-- Mobile Logo -->
+            <div class="mb-8 flex items-center justify-center lg:hidden">
+                <div class="flex h-12 w-12 items-center justify-center rounded-lg brand-bg text-white">
+                    <span class="material-symbols-outlined text-3xl">school</span>
                 </div>
             </div>
-            {% endif %}
             
-            <!-- Form -->
-            <form method="post" class="flex flex-col gap-5">
-                {% csrf_token %}
+            <div class="mx-auto flex w-full max-w-[420px] flex-col gap-6">
+                <!-- Form Header -->
+                <div class="flex flex-col gap-2 text-center lg:text-left">
+                    <h2 class="text-3xl font-bold text-gray-900">Iniciar Sesión</h2>
+                    <p class="text-gray-600">Ingresa tus credenciales para acceder al sistema.</p>
+                </div>
                 
-                <!-- Username -->
-                <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-gray-700">
-                        Usuario o Correo Institucional
-                    </label>
-                    <div class="relative">
-                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">person</span>
-                        <input 
-                            class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
-                            placeholder="ej. jperez@unemi.edu.ec" 
-                            type="text"
-                            name="username" 
-                            id="{{ form.username.id_for_label }}"
-                            autocomplete="username"
-                            required
-                        />
+                <!-- Error Messages -->
+                {% if form.errors %}
+                <div class="rounded-md border border-red-300 bg-red-50 p-3.5 text-sm text-red-800">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-lg">error</span>
+                        <span class="font-medium">Credenciales inválidas. Verifica tus datos.</span>
                     </div>
                 </div>
+                {% endif %}
                 
-                <!-- Password -->
-                <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-gray-700">
-                        Contraseña
-                    </label>
-                    <div class="relative">
-                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">lock</span>
-                        <input 
-                            class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
-                            placeholder="••••••••" 
-                            type="password"
-                            name="password" 
-                            id="{{ form.password.id_for_label }}"
-                            autocomplete="current-password"
-                            required
-                        />
+                <!-- Form -->
+                <form method="post" class="flex flex-col gap-5">
+                    {% csrf_token %}
+                    
+                    <!-- Username -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-semibold text-gray-700">
+                            Usuario o Correo Institucional
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">person</span>
+                            <input 
+                                class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
+                                placeholder="ej. jperez@unemi.edu.ec" 
+                                type="text"
+                                name="username" 
+                                id="{{ form.username.id_for_label }}"
+                                autocomplete="username"
+                                required
+                            />
+                        </div>
                     </div>
-                </div>
+                    
+                    <!-- Password -->
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-semibold text-gray-700">
+                            Contraseña
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-xl">lock</span>
+                            <input 
+                                class="input-professional h-11 w-full pl-11 pr-4 text-sm text-gray-900 placeholder-gray-400 bg-white" 
+                                placeholder="••••••••" 
+                                type="password"
+                                name="password" 
+                                id="{{ form.password.id_for_label }}"
+                                autocomplete="current-password"
+                                required
+                            />
+                        </div>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <button 
+                        type="submit"
+                        class="btn-primary mt-2 flex h-11 w-full items-center justify-center gap-2 px-6 text-sm font-semibold text-white">
+                        <span>Ingresar al Sistema</span>
+                        <span class="material-symbols-outlined text-base">arrow_forward</span>
+                    </button>
+                </form>
                 
-                <!-- Submit Button -->
-                <button 
-                    type="submit"
-                    class="btn-primary mt-2 flex h-11 w-full items-center justify-center gap-2 px-6 text-sm font-semibold text-white">
-                    <span>Ingresar al Sistema</span>
-                    <span class="material-symbols-outlined text-base">arrow_forward</span>
-                </button>
-            </form>
-            
-            <!-- Mobile Footer -->
-            <div class="mt-6 border-t border-gray-200 pt-5 text-center lg:hidden">
-                <p class="text-xs text-gray-500">© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
+                <!-- Mobile Footer -->
+                <div class="mt-6 border-t border-gray-200 pt-5 text-center lg:hidden">
+                    <p class="text-xs text-gray-500">© {% now "Y" %} UNEMI. Todos los derechos reservados.</p>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Script de mensajes (alerts) -->
+    <script defer src="{% static 'js/message.js' %}"></script>
 </body>
 </html>

@@ -128,6 +128,36 @@ class UserToggleActiveView(LoginRequiredMixin, SuperUserRequiredMixin, View):
                 'error': 'Error al cambiar el estado del usuario.'
             }, status=500)
 
+from axes.utils import reset
+
+class UserUnlockView(LoginRequiredMixin, SuperUserRequiredMixin, View):
+    """
+    Vista para desbloquear (resetear intentos de login) un usuario manualmente.
+    """
+    def post(self, request, pk):
+        try:
+            user = get_object_or_404(User, pk=pk)
+            
+            # Resetear intentos en Axes
+            # axes.utils.reset puede tomar username o ip. Aquí usamos username.
+            # Nota: reset() devuelve count de accesos eliminados.
+            count = reset(username=user.username)
+            
+            logger.info(f"Usuario {user.username} desbloqueado (Axes reset) por {request.user.username}. Registros eliminados: {count}")
+            
+            messages.success(request, f"Bloqueo de seguridad eliminado para {user.username}.")
+            return JsonResponse({
+                'success': True,
+                'message': f"Bloqueo eliminado correctamente."
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al desbloquear usuario {pk}: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': 'Error al intentar desbloquear el usuario.'
+            }, status=500)
+
 class UserPasswordChangeView(LoginRequiredMixin, SuperUserRequiredMixin, UpdateView):
     """
     Vista AJAX para que un administrador cambie la contraseña de un usuario.

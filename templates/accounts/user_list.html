@@ -142,6 +142,9 @@
                             <button @click="openPasswordModal('{% url 'accounts:user_password_change' u.pk %}', '{{ u.username }}')" title="Cambiar contraseña" class="text-orange-600 hover:text-orange-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 mb-0.5 inline-block">
                                 <i class="fas fa-key"></i>
                             </button>
+                            <button @click="unlockUser('{% url 'accounts:user_unlock' u.pk %}', '{{ u.username }}')" title="Desbloquear Acceso (Resetear intentos)" class="text-green-600 hover:text-green-900 bg-white border border-gray-300 px-2 py-1 rounded-sm shadow-sm hover:bg-gray-50 mb-0.5 inline-block">
+                                <i class="fas fa-unlock-alt"></i>
+                            </button>
                             {% endif %}
                             
                             {% if u != request.user and perms_u.can_delete %}

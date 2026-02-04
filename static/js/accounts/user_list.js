@@ -167,6 +167,41 @@ document.addEventListener('alpine:init', () => {
                     this.loadingPassword = false;
                     Swal.fire('Error', 'Error técnico al procesar el cambio.', 'error');
                 });
+        },
+
+        unlockUser(url, username) {
+            Swal.fire({
+                title: '¿Desbloquear Usuario?',
+                text: `¿Estás seguro de resetear los intentos de login para ${username}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, desbloquear',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                Swal.fire('Desbloqueado!', data.message, 'success');
+                            } else {
+                                Swal.fire('Error', data.error || 'No se pudo desbloquear.', 'error');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            Swal.fire('Error', 'Error técnico al desbloquear.', 'error');
+                        });
+                }
+            });
         }
     }));
 });
