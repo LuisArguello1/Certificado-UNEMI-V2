@@ -31,9 +31,13 @@ class CustomLoginView(LoginView):
         
         username = form.cleaned_data.get('username')
         if username:
-            # Buscar intentos fallidos para este usuario (solo username, no IP)
+            # Obtener la IP real del cliente usando el helper de axes
+            ip_address = get_client_ip_address(self.request)
+            
+            # Buscar intentos fallidos para esta combinacion Usuario + IP (Bloqueo Quirúrgico)
             attempts = AccessAttempt.objects.filter(
-                username=username
+                username=username,
+                ip_address=ip_address
             ).first()
             
             if attempts:

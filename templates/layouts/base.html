@@ -62,7 +62,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- SweetAlert2 para modales elegantes -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" nonce="{{ csp_nonce }}"></script>
     <!-- Block para CSS adicional -->
     {% block extra_css %}{% endblock %}
     
@@ -135,13 +135,13 @@
     {% include 'partials/scripts.html' %}
     
     <!-- Sidebar Controller -->
-    <script type="module" src="{% static 'js/sidebar.js' %}"></script>
+    <script type="module" src="{% static 'js/sidebar.js' %}" nonce="{{ csp_nonce }}"></script>
     
     <!-- Block para JS adicional -->
     {% block extra_js %}{% endblock %}
 
         <!-- PWA Service Worker Registration -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/static/sw.js')

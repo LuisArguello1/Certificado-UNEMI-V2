@@ -1,4 +1,0 @@
-Get-Process | Where-Object {$_.Name -like "*soffice*"} | Stop-Process -Force -ErrorAction SilentlyContinue; Get-Process | Where-Object {$_.Name -like "*soffice*"}
-
-
-Remove-Item -Path "$env:LOCALAPPDATA\Temp\LO_shared_profile" -Recurse -Force -ErrorAction SilentlyContinue; Write-Host "Perfil temporal de LibreOffice limpiado"

@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
         items.forEach(dir => {
             const card = document.createElement('div');
             card.className = 'flex items-center p-4 bg-white border border-gray-200 rounded-sm cursor-pointer hover:border-black hover:shadow-md transition-all group';
-            card.onclick = () => selectDireccion(dir);
+            card.addEventListener('click', () => selectDireccion(dir));
 
             card.innerHTML = `
                 <div class="w-10 h-10 rounded-sm bg-gray-50 text-gray-400 flex items-center justify-center mr-4 group-hover:bg-black group-hover:text-white border border-gray-100 transition-colors">
@@ -165,11 +165,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     <p class="text-[9px] text-gray-400 mt-2 max-w-sm uppercase font-bold tracking-tighter">
                         Esta dirección no posee diseños base activos en el sistema.
                     </p>
-                    <button onclick="document.getElementById('closePlantillaModalBtn').click()" class="mt-6 px-5 py-2 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-sm hover:bg-gray-800">
+                    <button type="button" id="closeNoPlantillasBtn" class="mt-6 px-5 py-2 bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-sm hover:bg-gray-800">
                         CERRAR
                     </button>
                 </div>
             `;
+            const btn = document.getElementById('closeNoPlantillasBtn');
+            if (btn) btn.addEventListener('click', closePlantillaModal);
             return;
         }
 
@@ -221,17 +223,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 <p class="text-[9px] text-gray-400 mt-1 line-clamp-2 uppercase font-bold tracking-tighter">${item.descripcion || 'Sin descripción'}</p>
             </div>
         `;
-        card.onclick = () => selectPlantilla(item);
+        card.addEventListener('click', () => selectPlantilla(item));
         return card;
     }
 
     function selectPlantilla(item) {
         hiddenPlantillaInput.value = item.id;
         selectedPlantillaText.textContent = item.nombre.toUpperCase();
-            plantillaDisplayBox.classList.remove('opacity-60', 'bg-gray-50', 'border-dashed');
-            plantillaDisplayBox.classList.add('bg-white', 'border-gray-300', 'text-black');
+        plantillaDisplayBox.classList.remove('opacity-60', 'bg-gray-50', 'border-dashed');
+        plantillaDisplayBox.classList.add('bg-white', 'border-gray-300', 'text-black');
         const iconContainer = plantillaDisplayBox.querySelector('.w-8');
-        iconContainer.className = 'w-8 h-8 rounded-sm bg-black text-white flex items-center justify-center mr-3 border border-black';
+        if (iconContainer) {
+            iconContainer.className = 'w-8 h-8 rounded-sm bg-black text-white flex items-center justify-center mr-3 border border-black';
+        }
         closePlantillaModal();
     }
 
@@ -294,6 +298,9 @@ document.addEventListener('DOMContentLoaded', function () {
         fileInput.addEventListener('change', function () {
             handleFiles(this.files);
         });
+
+        // Nota: El clic ahora es manejado nativamente por el input transparente (z-10)
+        // que cubre toda la zona.
 
         function handleFiles(files) {
             if (files.length > 0) {

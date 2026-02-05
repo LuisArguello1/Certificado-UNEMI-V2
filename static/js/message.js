@@ -8,15 +8,15 @@ function showMessage(text, type = 'info') {
         container.className = 'messages-container';
         document.body.appendChild(container);
     }
-    
+
     const messageId = Date.now();
     const icons = {
         'success': 'check',
-        'error': 'times', 
+        'error': 'times',
         'warning': 'exclamation',
         'info': 'info'
     };
-    
+
     // HTML del mensaje con todos los componentes
     const messageHtml = `
         <div id="message-${messageId}" 
@@ -34,41 +34,41 @@ function showMessage(text, type = 'info') {
                         <p>${text}</p>
                     </div>
                 </div>
-                <button onclick="closeMessage(${messageId})" class="close-btn" aria-label="Cerrar">
+                <button class="close-btn" aria-label="Cerrar" data-close-message="${messageId}">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="progress-bar"></div>
         </div>
     `;
-    
+
     container.insertAdjacentHTML('beforeend', messageHtml);
     container.style.display = 'block';
-    
+
     // Aplicar aparición con retraso pequeño para que la transición funcione
     setTimeout(() => {
         const messageElement = document.getElementById(`message-${messageId}`);
         if (messageElement) {
             messageElement.style.opacity = '1';
             messageElement.style.animation = 'message-slide-in 0.3s forwards';
-            
+
             // Añadir evento para pausar la barra de progreso al pasar el mouse
-            messageElement.addEventListener('mouseenter', function() {
+            messageElement.addEventListener('mouseenter', function () {
                 const progressBar = this.querySelector('.progress-bar::after');
                 if (progressBar) progressBar.style.animationPlayState = 'paused';
             });
-            
+
             // Reanudar la barra de progreso al quitar el mouse
-            messageElement.addEventListener('mouseleave', function() {
+            messageElement.addEventListener('mouseleave', function () {
                 const progressBar = this.querySelector('.progress-bar::after');
                 if (progressBar) progressBar.style.animationPlayState = 'running';
             });
         }
     }, 10);
-    
+
     // Auto-hide después de un tiempo
     setTimeout(() => closeMessage(messageId), 6000);
-    
+
     // Devolver el ID por si se necesita para referencias futuras
     return messageId;
 }
@@ -79,13 +79,13 @@ function closeMessage(messageId) {
         // Aplicar la animación de salida
         message.classList.add('animate-slideOutRight');
         message.style.opacity = '0';
-        
+
         // Remover del DOM después de la animación
-        setTimeout(function() {
+        setTimeout(function () {
             if (message && message.parentNode) {
                 message.parentNode.removeChild(message);
             }
-            
+
             // Ocultar el contenedor si no hay más mensajes
             const container = document.getElementById('messagesContainer');
             if (container && container.children.length === 0) {
@@ -96,10 +96,10 @@ function closeMessage(messageId) {
 }
 
 // Inicializar al cargar la página
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Escalonar la aparición de los mensajes existentes
     const messages = document.querySelectorAll('.message-alert');
-    
+
     messages.forEach((message, index) => {
         // Aplicar un retraso progresivo para mensajes múltiples
         setTimeout(() => {
@@ -107,22 +107,41 @@ document.addEventListener('DOMContentLoaded', function() {
             message.style.opacity = '1';
             message.style.animation = 'message-slide-in 0.3s forwards';
         }, 150 * index); // Reducido ligeramente para mejor fluidez
-        
+
         // Auto-hide messages después de un tiempo
         setTimeout(() => {
             closeMessage(message.dataset.messageId);
         }, 6000 + (index * 800)); // Ajustado para mejor experiencia
-        
+
         // Añadir evento para pausar la barra de progreso al pasar el mouse
-        message.addEventListener('mouseenter', function() {
+        message.addEventListener('mouseenter', function () {
             const progressBar = this.querySelector('.progress-bar::after');
             if (progressBar) progressBar.style.animationPlayState = 'paused';
         });
-        
+
         // Reanudar la barra de progreso al quitar el mouse
-        message.addEventListener('mouseleave', function() {
+        message.addEventListener('mouseleave', function () {
             const progressBar = this.querySelector('.progress-bar::after');
             if (progressBar) progressBar.style.animationPlayState = 'running';
         });
     });
+
+    // Delegación de eventos para cerrar mensajes (CSP Compliant)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-close-message]');
+        if (btn) {
+            const id = btn.dataset.closeMessage;
+            closeMessage(id);
+        }
+    });
+
+    // Atajo global para logout (integrado aquí o en base.html)
+    const logoutLink = document.getElementById('logout-link');
+    if (logoutLink) {
+        logoutLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('logout-form');
+            if (form) form.submit();
+        });
+    }
 });

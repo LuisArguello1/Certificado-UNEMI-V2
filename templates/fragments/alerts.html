@@ -17,7 +17,7 @@
                     <p>{{ message }}</p>
                 </div>
             </div>
-            <button onclick="closeMessage({{ forloop.counter }})" class="close-btn" aria-label="Cerrar">
+            <button class="close-btn" aria-label="Cerrar" data-close-message="{{ forloop.counter }}">
                 <i class="fas fa-times"></i>
             </button>
         </div>

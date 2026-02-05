@@ -450,6 +450,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/accounts/user_list.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'js/accounts/user_list.js' %}?v={% now 'U' %}" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
 

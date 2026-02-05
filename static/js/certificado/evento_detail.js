@@ -185,13 +185,13 @@ function saveCreateModal() {
     formData.append('csrfmiddlewaretoken', csrftoken);
 
     // Deshabilitar botón para evitar doble envío
-    const saveBtn = document.querySelector('#createModal button[onclick="saveCreateModal()"]');
+    const saveBtn = document.getElementById('btnSaveCreate');
     if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GUARDANDO...';
     }
 
-    fetch('', { method: 'POST', body: formData })
+    fetch(window.location.pathname, { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -794,69 +794,87 @@ function updateNomina(params) {
  * Aplica el ordenamiento global (A-Z / Z-A)
  * @param {string} direction - 'asc' o 'desc'
  */
-window.aplicarOrdenamiento = function (direction) {
+function aplicarOrdenamiento(direction) {
     updateNomina({ sort: direction });
 }
 
-// Inicialización
+/**
+ * Inicialización de listeners de eventos (CSP Compliant)
+ */
 document.addEventListener('DOMContentLoaded', function () {
-    const progressSection = document.getElementById('progressSection');
-    if (progressSection && !progressSection.classList.contains('hidden')) {
-        startPolling();
-    }
+    // Botones Principales
+    const btnGenerate = document.getElementById('btnGenerate');
+    if (btnGenerate) btnGenerate.addEventListener('click', startGeneration);
 
-    const searchInput = document.getElementById('nominaSearch');
-    let searchTimeout = null;
+    const btnSend = document.getElementById('btnSend');
+    if (btnSend) btnSend.addEventListener('click', openSendModal);
 
-    if (searchInput) {
-        searchInput.addEventListener('input', function (e) {
+    const btnDeleteCertificates = document.getElementById('btnDeleteCertificates');
+    if (btnDeleteCertificates) btnDeleteCertificates.addEventListener('click', confirmarEliminacionCertificados);
+
+    const btnOpenCreateModal = document.getElementById('btnOpenCreateModal');
+    if (btnOpenCreateModal) btnOpenCreateModal.addEventListener('click', openCreateModal);
+
+    const toggleQrInput = document.getElementById('toggleQrInput');
+    if (toggleQrInput) toggleQrInput.addEventListener('change', toggleQrSeguridad);
+
+    const sortAsc = document.getElementById('sortAsc');
+    if (sortAsc) sortAsc.addEventListener('click', () => aplicarOrdenamiento('asc'));
+
+    const sortDesc = document.getElementById('sortDesc');
+    if (sortDesc) sortDesc.addEventListener('click', () => aplicarOrdenamiento('desc'));
+
+    // Búsqueda en nómina
+    const nominaSearch = document.getElementById('nominaSearch');
+    if (nominaSearch) {
+        let searchTimeout;
+        nominaSearch.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
-            const term = e.target.value.trim();
-
-            // Buscar solo si tiene 5+ caracteres o si el campo se vacía (reset)
-            if (term.length >= 5 || term.length === 0) {
-                searchTimeout = setTimeout(() => {
-                    updateNomina({ q: term });
-                }, 400);
+            const val = e.target.value;
+            if (val.length >= 5 || val.length === 0) {
+                searchTimeout = setTimeout(() => updateNomina({ q: val }), 500);
             }
         });
     }
 
-    // Manejar envío del formulario de eliminación de evento
-    const deleteForm = document.getElementById('deleteEventForm');
-    if (deleteForm) {
-        deleteForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
+    // Delegación de eventos para la tabla de estudiantes
+    const tableContainer = document.getElementById('estudiantesTableContainer');
+    if (tableContainer) {
+        tableContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
 
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> ELIMINANDO...';
+            const action = btn.dataset.action;
+            const id = btn.dataset.id;
 
-            fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json',
-                }
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        showToast("EVENTO ELIMINADO");
-                        setTimeout(() => window.location.href = data.redirect_url || '/certificados/lista/', 1000);
-                    } else {
-                        showToast(data.error.toUpperCase());
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = originalText;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast("ERROR AL ELIMINAR EVENTO");
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                });
+            if (action === 'generate-individual') {
+                generateIndividual(id);
+            } else if (action === 'edit-student') {
+                openEditModal(id, btn.dataset.nombre, btn.dataset.correo);
+            } else if (action === 'delete-student') {
+                openDeleteModal(id, btn.dataset.nombre);
+            }
         });
     }
+
+    // Modal Listeners (Backdrops and Cancel Buttons)
+    const modalMappings = [
+        { id: 'editModal', cancel: 'btnCancelEdit', save: 'btnSaveEdit', backdrop: 'editModalBackdrop', closeFn: closeEditModal, saveFn: saveEditModal },
+        { id: 'createModal', cancel: 'btnCancelCreate', save: 'btnSaveCreate', backdrop: 'createModalBackdrop', closeFn: closeCreateModal, saveFn: saveCreateModal },
+        { id: 'deleteModal', cancel: 'btnCancelDelete', save: 'btnConfirmDelete', backdrop: 'deleteModalBackdrop', closeFn: closeDeleteModal, saveFn: confirmDeleteModal },
+        { id: 'sendModal', cancel: 'btnCancelSend', save: 'btnConfirmSend', backdrop: 'sendModalBackdrop', closeFn: closeSendModal, saveFn: confirmSend },
+        { id: 'deleteCertificatesModal', cancel: 'btnCancelDeleteCertificates', save: 'btnConfirmDeleteCertificates', backdrop: 'deleteCertificatesModalBackdrop', closeFn: closeDeleteCertificatesModal, saveFn: confirmDeleteCertificates },
+        { id: 'deleteEventModal', cancel: 'btnCancelDeleteEvent', backdrop: 'deleteEventModalBackdrop', closeFn: cerrarModalEvento }
+    ];
+
+    modalMappings.forEach(m => {
+        const cancelBtn = document.getElementById(m.cancel);
+        if (cancelBtn) cancelBtn.addEventListener('click', m.closeFn);
+
+        const saveBtn = document.getElementById(m.save);
+        if (saveBtn) saveBtn.addEventListener('click', m.saveFn);
+
+        const backdrop = document.getElementById(m.backdrop);
+        if (backdrop) backdrop.addEventListener('click', m.closeFn);
+    });
 });

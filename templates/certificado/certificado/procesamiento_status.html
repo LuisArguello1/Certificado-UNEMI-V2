@@ -185,7 +185,7 @@
 
 <!-- Auto-refresh cada 5 segundos si el procesamiento está en curso -->
 {% if lote.estado == 'processing' or lote.estado == 'pending' %}
-<script>
+<script nonce="{{ csp_nonce }}">
     setTimeout(function () {
         location.reload();
     }, 5000);  // 5 segundos
