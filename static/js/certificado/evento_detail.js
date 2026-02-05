@@ -593,10 +593,37 @@ function confirmSend() {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                showToast(data.message.toUpperCase());
+                const pendingCount = data.count || 0;
+                const alreadySent = data.already_sent || 0;
+                const totalGenerated = pendingCount + alreadySent;
+
+                let message = '';
+
+                // Caso 1: Todos los correos ya fueron enviados
+                if (pendingCount === 0) {
+                    message = `Todos los correos ya fueron enviados (${alreadySent}/${totalGenerated})`;
+                    showToast(message.toUpperCase());
+                    if (window.loadingOverlay) {
+                        window.loadingOverlay.hide();
+                    }
+                    // Recargar página para actualizar UI
+                    setTimeout(() => location.reload(), 1500);
+                    return; // No iniciar polling
+                }
+
+                // Caso 2: Algunos correos ya enviados, otros pendientes
+                if (alreadySent > 0) {
+                    message = `Enviando ${pendingCount} correo${pendingCount > 1 ? 's' : ''} pendiente${pendingCount > 1 ? 's' : ''} (${alreadySent} ya enviado${alreadySent > 1 ? 's' : ''})`;
+                }
+                // Caso 3: Ningún correo enviado aún
+                else {
+                    message = `Enviando ${pendingCount} correo${pendingCount > 1 ? 's' : ''}`;
+                }
+
+                showToast(message.toUpperCase());
 
                 if (window.loadingOverlay) {
-                    window.loadingOverlay.updateMessage('Enviando correos electrónicos. Por favor espere...');
+                    window.loadingOverlay.updateMessage(message);
                 }
 
                 startPolling('SEND');
