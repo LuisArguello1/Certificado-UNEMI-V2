@@ -24,6 +24,7 @@ class ExcelUploadForm(CoreBaseForm):
         help_text='Debe contener dos columnas: NOMBRES COMPLETOS, CORREO ELECTRONICO',
         widget=forms.FileInput(attrs={
             'accept': '.xlsx,.xls',
+            'class': 'opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10',
         })
     )
     

@@ -74,7 +74,7 @@
             </div>
         </div>
 
-        <script>
+        <script nonce="{{ csp_nonce }}">
             // Animación inteligente para la barra de progreso
             document.addEventListener('DOMContentLoaded', () => {
                 const bar = document.getElementById('email-progress-bar');
@@ -300,5 +300,5 @@
 {{ chart_data|json_script:"chart-data-source" }}
 
 <!-- Lógica del Dashboard -->
-<script src="{% static 'js/core/dashboard.js' %}"></script>
+<script src="{% static 'js/core/dashboard.js' %}" nonce="{{ csp_nonce }}"></script>
 {% endblock %}

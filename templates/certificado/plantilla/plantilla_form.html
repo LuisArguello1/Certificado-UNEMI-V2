@@ -251,7 +251,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // Inyectar datos de direcciones para el modal selector
 window.DIRECCIONES_DATA = [
     {% for dir in form.direccion.field.queryset %}
@@ -273,5 +273,5 @@ window.DIRECCIONES_DATA = [
     {% endfor %}
 ];
 </script>
-<script src="{% static 'js/certificado/plantilla_form.js' %}"></script>
+<script src="{% static 'js/certificado/plantilla_form.js' %}" nonce="{{ csp_nonce }}"></script>
 {% endblock %}

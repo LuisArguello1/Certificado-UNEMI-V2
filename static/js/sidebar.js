@@ -89,13 +89,21 @@ class SidebarController {
             this.resizer.addEventListener('mousedown', (e) => this.startResize(e));
         }
 
-        window.sidebarAPI = {
-            undock: () => this.undock(),
-            dock: () => this.dock(),
-            minimize: () => this.minimize(),
-            restore: () => this.restore(),
-            toggleMobile: (force) => this.toggleMobile(force)
-        };
+        // --- Control Buttons (CSP Compliant) ---
+        const btnDock = document.getElementById('sidebar-dock-btn');
+        if (btnDock) btnDock.addEventListener('click', () => this.dock());
+
+        const btnMin = document.getElementById('sidebar-minimize-btn');
+        if (btnMin) btnMin.addEventListener('click', () => this.minimize());
+
+        const btnMax = document.getElementById('sidebar-max-btn');
+        if (btnMax) btnMax.addEventListener('click', () => this.dock());
+
+        const btnUndock = document.getElementById('sidebar-undock-btn');
+        if (btnUndock) btnUndock.addEventListener('click', () => this.undock());
+
+        const btnMobileClose = document.getElementById('sidebar-mobile-close-btn');
+        if (btnMobileClose) btnMobileClose.addEventListener('click', () => this.toggleMobile(false));
     }
 
     // --- Core Logic ---

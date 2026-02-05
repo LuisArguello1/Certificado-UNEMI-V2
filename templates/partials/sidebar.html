@@ -37,16 +37,16 @@
 
     <!-- Window Controls (Floating Only) -->
     <div class="window-controls">
-        <button class="win-btn win-btn-close" onclick="sidebarAPI.dock()" aria-label="Acoplar"
+        <button class="win-btn win-btn-close" id="sidebar-dock-btn" aria-label="Acoplar"
             title="Acoplar a la izquierda">
             <i class="fas fa-times"></i>
         </button>
-        <button class="win-btn win-btn-min" onclick="sidebarAPI.minimize()" aria-label="Minimizar"
+        <button class="win-btn win-btn-min" id="sidebar-minimize-btn" aria-label="Minimizar"
             title="Minimizar a icono">
             <i class="fas fa-minus"></i>
         </button>
         <!-- Optional Maximize -->
-        <button class="win-btn win-btn-max" onclick="sidebarAPI.dock()" aria-label="Expandir" title="Acoplar">
+        <button class="win-btn win-btn-max" id="sidebar-max-btn" aria-label="Expandir" title="Acoplar">
             <i class="fas fa-expand-alt"></i>
         </button>
     </div>
@@ -55,14 +55,14 @@
     <div class="flex items-center justify-between h-14 border-b border-gray-800 px-4 shrink-0">
         <div class="flex items-center gap-2.5 overflow-hidden">
             <!-- Undock Button (Visible only when docked via CSS) -->
-            <button class="dock-only-btn text-gray-500 hover:text-white transition-colors" onclick="sidebarAPI.undock()"
+            <button class="dock-only-btn text-gray-500 hover:text-white transition-colors" id="sidebar-undock-btn"
                 title="Desacoplar ventana">
                 <i class="fas fa-columns text-lg transform rotate-180"></i>
             </button>
             <h1 class="text-base font-semibold tracking-tight whitespace-nowrap">UNEMI</h1>
 
             <!-- Mobile Close Button -->
-            <button class="lg:hidden ml-4 text-gray-400 hover:text-white" onclick="sidebarAPI.toggleMobile(false)">
+            <button class="lg:hidden ml-4 text-gray-400 hover:text-white" id="sidebar-mobile-close-btn">
                 <i class="fas fa-times"></i>
             </button>
         </div>

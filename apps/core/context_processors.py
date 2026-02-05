@@ -30,4 +30,5 @@ def global_context(request):
         'current_year': datetime.now().year,
         'menu_items': MenuService.get_menu_items(request.path, user),
         'perms_u': perms_u,
+        'csp_nonce': getattr(request, 'csp_nonce', ''),
     }

@@ -161,13 +161,21 @@ class CertificadoListView(LoginRequiredMixin, BaseCatalogoMixin, ListView):
     
     def get_queryset(self):
         from django.db.models import Count
+        search_query = self.request.GET.get('search', '').strip()
+        
         qs = super().get_queryset().select_related(
             'direccion', 'modalidad', 'tipo', 'tipo_evento', 'created_by'
         ).annotate(
             num_estudiantes=Count('estudiantes')
-        ).order_by('-created_at')
-        
-        return qs
+        )
+
+        if search_query:
+            qs = qs.filter(
+                Q(nombre_evento__icontains=search_query) |
+                Q(pk__icontains=search_query)
+            )
+            
+        return qs.order_by('-created_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
