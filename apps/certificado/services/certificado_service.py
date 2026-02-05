@@ -204,17 +204,18 @@ class CertificadoService:
             raise
 
     @staticmethod
-    def initiate_sending_lote(evento_id: int) -> Tuple[int, str]:
+    def initiate_sending_lote(evento_id: int) -> Tuple[int, str, int]:
         """
         Inicia el envío masivo de certificados por correo electrónico.
 
         Verifica límites diarios, actualiza estados y encola tareas de envío.
+        Solo procesa certificados que NO han sido enviados previamente.
 
         Args:
             evento_id (int): ID del evento.
 
         Returns:
-            Tuple[int, str]: (Cantidad de envíos encolados, Mensaje de estado).
+            Tuple[int, str, int]: (Cantidad de envíos encolados, Mensaje de estado, Correos ya enviados).
         """
         # Importación local para evitar dependencias circulares
         from ..tasks import send_certificate_email_task
@@ -222,22 +223,54 @@ class CertificadoService:
         try:
             evento = Evento.objects.get(id=evento_id)
             
+            # Contar certificados ya enviados para informar al usuario
+            already_sent_count = Certificado.objects.filter(
+                estudiante__evento=evento, 
+                estado__in=['completed', 'sent'],
+                archivo_pdf__isnull=False,
+                enviado_email=True
+            ).exclude(archivo_pdf='').count()
+            
             # Buscar certificados listos para enviar
-            # Deben estar 'completed' (generados) y tener archivo PDF
+            # Deben estar 'completed' (generados), tener archivo PDF y NO estar enviados
             certificados = Certificado.objects.filter(
                 estudiante__evento=evento, 
                 estado='completed',
-                archivo_pdf__isnull=False
+                archivo_pdf__isnull=False,
+                enviado_email=False  # Solo los que NO han sido enviados
             ).exclude(archivo_pdf='')
             
             count = certificados.count()
             if count == 0:
-                return 0, "No hay certificados generados listos para enviar."
+                if already_sent_count > 0:
+                    mensaje = f"Todos los certificados ya fueron enviados ({already_sent_count} total)."
+                else:
+                    mensaje = "No hay certificados generados listos para enviar."
+                return 0, mensaje, already_sent_count
             
             # Verificar límite diario de correos
             permitido, _, mensaje_limite = EmailDailyLimit.puede_enviar_lote(count)
             if not permitido:
                 raise ValueError(mensaje_limite)
+            
+            # CRÍTICO: Asegurar que existe ProcesamientoLote para el polling
+            total_estudiantes = Estudiante.objects.filter(evento=evento).count()
+            lote, created = ProcesamientoLote.objects.get_or_create(
+                evento=evento,
+                defaults={
+                    'total_estudiantes': total_estudiantes,
+                    'estado': 'processing',
+                    'fecha_inicio': timezone.now()
+                }
+            )
+            
+            if not created:
+                # Si ya existe, actualizarlo para envío
+                lote.estado = 'processing'
+                lote.total_estudiantes = total_estudiantes
+                if not lote.fecha_inicio:
+                    lote.fecha_inicio = timezone.now()
+                lote.save()
             
             # Actualización masiva de estado a 'sending_email'
             # Esto bloquea reintentos inmediatos y actualiza la UI
@@ -251,14 +284,14 @@ class CertificadoService:
             for cert_id in cert_ids:
                 send_certificate_email_task.delay(cert_id)
             
-            # Actualizar estado del lote si existe
-            lote = ProcesamientoLote.objects.filter(evento=evento).first()
-            if lote:
-                lote.estado = 'processing'
-                lote.save(update_fields=['estado'])
+            # Mensaje informativo
+            if already_sent_count > 0:
+                mensaje = f"Envío masivo iniciado: {count} pendiente(s), {already_sent_count} ya enviado(s)."
+            else:
+                mensaje = "Envío masivo encolado exitosamente."
                 
-            logger.info(f"Envío iniciado para evento {evento_id}. {count} correos encolados.")
-            return count, "Envío masivo encolado exitosamente."
+            logger.info(f"Envío iniciado para evento {evento_id}. {count} correos encolados, {already_sent_count} ya enviados.")
+            return count, mensaje, already_sent_count
             
         except ValueError as e:
             # Errores de validación esperados (como límites) se registran como advertencia sin traceback
@@ -268,3 +301,5 @@ class CertificadoService:
             # Errores críticos sí mantienen el traceback para depuración
             logger.error(f"Error crítico iniciando envío para evento {evento_id}: {e}", exc_info=True)
             raise
+
+

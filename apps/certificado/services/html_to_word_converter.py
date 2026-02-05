@@ -522,10 +522,10 @@ class HTMLToWordConverter:
                 row_data = []
                 
                 for cell in cells:
-                    cell_text = cell.get_text(strip=True)
+                    # Guardar el elemento completo para procesarlo con formato
                     is_header = cell.name == 'th'
                     row_data.append({
-                        'text': cell_text,
+                        'element': cell,  # Guardar el elemento Tag completo
                         'bold': is_header
                     })
                 
@@ -564,16 +564,33 @@ class HTMLToWordConverter:
                 
                 table.autofit = True
                 
-                # Llenar la tabla
+                # Llenar la tabla con formato enriquecido
                 for row_idx, row_data in enumerate(rows_data):
                     for col_idx, cell_data in enumerate(row_data):
                         if col_idx < num_cols:
                             cell = table.rows[row_idx].cells[col_idx]
-                            cell.text = cell_data.get('text', '')
                             
-                            if cell_data.get('bold') and cell.paragraphs:
-                                for run in cell.paragraphs[0].runs:
-                                    run.bold = True
+                            # Procesar el contenido HTML de la celda
+                            cell_element = cell_data.get('element')
+                            if cell_element:
+                                # Limpiar el párrafo por defecto de la celda
+                                if cell.paragraphs:
+                                    cell_paragraph = cell.paragraphs[0]
+                                    self._clear_paragraph(cell_paragraph)
+                                    
+                                    # Procesar el contenido con formato
+                                    self._process_elements(
+                                        cell_element,
+                                        cell_paragraph,
+                                        {'bold': cell_data.get('bold', False), 'italic': False, 'underline': False},
+                                        is_first_in_block=True
+                                    )
+                            else:
+                                # Fallback para compatibilidad con código antiguo
+                                cell.text = cell_data.get('text', '')
+                                if cell_data.get('bold') and cell.paragraphs:
+                                    for run in cell.paragraphs[0].runs:
+                                        run.bold = True
                 
                 self._set_table_autofit(table, num_cols)
                 

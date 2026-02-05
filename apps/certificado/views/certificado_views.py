@@ -416,12 +416,14 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
     def _handle_start_sending(self, request):
+        """Maneja la acción de iniciar envío masivo de correos."""
         try:
-            count, message = CertificadoService.initiate_sending_lote(self.object.id)
+            count, message, already_sent = CertificadoService.initiate_sending_lote(self.object.id)
             return JsonResponse({
                 'success': True, 
                 'message': message,
-                'count': count
+                'count': count,
+                'already_sent': already_sent
             })
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)

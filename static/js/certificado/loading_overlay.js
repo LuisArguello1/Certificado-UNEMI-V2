@@ -8,21 +8,21 @@
 const LOADING_ACTIONS = {
     GENERATE: {
         title: 'Generando Certificados',
-        icon: 'fa-cog',
+        icon: 'fas fa-sync-alt',
         color: 'bg-black',
         successLabel: 'Generados',
         failedLabel: 'Fallidos'
     },
     SEND: {
         title: 'Enviando Correos',
-        icon: 'fa-paper-plane',
+        icon: 'fas fa-sync-alt',
         color: 'bg-indigo-600',
         successLabel: 'Enviados',
         failedLabel: 'Fallidos'
     },
     INDIVIDUAL: {
         title: 'Generando Certificado',
-        icon: 'fa-user-check',
+        icon: 'fas fa-sync-alt',
         color: 'bg-gray-800',
         successLabel: 'Completado',
         failedLabel: 'Error'
