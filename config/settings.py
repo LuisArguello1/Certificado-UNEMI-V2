@@ -106,8 +106,32 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# 5.1. CONFIGURACIÓN DE ALMACENAMIENTO (AZURE)
+AZURE_ACCOUNT_NAME = env('AZURE_ACCOUNT_NAME')
+AZURE_ACCOUNT_KEY = env('AZURE_ACCOUNT_KEY')
+AZURE_CONTAINER = env('AZURE_CONTAINER')
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.azure_storage.AzureStorage",
+        "OPTIONS": {
+            "account_name": AZURE_ACCOUNT_NAME,
+            "account_key": AZURE_ACCOUNT_KEY,
+            "azure_container": AZURE_CONTAINER,  # Correcto para django-storages
+            "timeout": 20,
+            "expiration_secs": 3600,  # expiration_days no existe, usar expiration_secs
+            "overwrite_files": False,
+            "location": "",
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# Configuración de archivos media (Azure Storage)
+MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media_temp')  # Solo para archivos temporales locales
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 TAILWIND_APP_NAME = 'theme'
@@ -178,10 +202,8 @@ CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=1800)
 SITE_URL = env('SITE_URL', default='http://localhost:8000')
 LIBREOFFICE_PATH = env('LIBREOFFICE_PATH', default=r"C:\Program Files\LibreOffice\program\soffice.exe")
 
-CERTIFICADO_STORAGE_PATH = os.path.join(MEDIA_ROOT, 'certificados')
-CERTIFICADO_TEMPLATES_PATH = os.path.join(MEDIA_ROOT, 'plantillas_certificado')
-os.makedirs(CERTIFICADO_STORAGE_PATH, exist_ok=True)
-os.makedirs(CERTIFICADO_TEMPLATES_PATH, exist_ok=True)
+# Las rutas de certificados y plantillas ahora se manejan automáticamente 
+# por Azure Storage usando los path generators en models.py
 
 EMAIL_DAILY_LIMIT = env.int('EMAIL_DAILY_LIMIT', default=400)
 EMAIL_RATE_LIMIT_SECONDS = env.int('EMAIL_RATE_LIMIT_SECONDS', default=2)
@@ -211,5 +233,16 @@ LOGGING = {
     'loggers': {
         'django': {'handlers': ['console', 'file_error'], 'level': 'INFO'},
         'apps.certificado': {'handlers': ['console', 'file_error'], 'level': 'INFO', 'propagate': False},
+        # Silenciar logs verbosos de Azure Storage (Request URL, headers, etc.)
+        'azure.core.pipeline.policies.http_logging_policy': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Solo warnings y errores
+            'propagate': False,
+        },
+        'azure.storage.blob': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
     },
 }

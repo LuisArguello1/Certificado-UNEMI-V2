@@ -702,42 +702,44 @@ function closeDeleteCertificatesModal() {
  * Ejecuta la eliminación masiva de certificados
  */
 function confirmDeleteCertificates() {
-    closeDeleteCertificatesModal();
+    const btn = document.getElementById('btnConfirmDeleteCertificates');
+    const originalText = btn ? btn.innerHTML : 'SÍ, ELIMINAR TODO';
+
+    // Deshabilitar botón y mostrar loading
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> ELIMINANDO...';
+    }
 
     const formData = new FormData();
     formData.append('action', 'delete_certificates');
     formData.append('csrfmiddlewaretoken', csrftoken);
 
-    // Mostrar loading overlay
-    if (window.loadingOverlay) {
-        window.loadingOverlay.show('Eliminando certificados y archivos físicos...');
-    } else {
-        showToast("ELIMINANDO CERTIFICADOS...");
-    }
-
     fetch('', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
+                closeDeleteCertificatesModal();
                 showToast(data.message.toUpperCase());
-
-                if (window.loadingOverlay) {
-                    window.loadingOverlay.updateMessage('¡Eliminación completada! Recargando...');
-                }
-
+                
+                // Recargar página
                 setTimeout(() => location.reload(), 1500);
             } else {
                 showToast(data.error.toUpperCase());
-                if (window.loadingOverlay) {
-                    window.loadingOverlay.hide();
+                // Revertir botón
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                 }
             }
         })
         .catch(error => {
             console.error('Error:', error);
             showToast("ERROR AL ELIMINAR");
-            if (window.loadingOverlay) {
-                window.loadingOverlay.hide();
+            // Revertir botón
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         });
 }

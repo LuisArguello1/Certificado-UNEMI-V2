@@ -219,7 +219,7 @@ class EventoDetailView(LoginRequiredMixin, DetailView):
         
         # Paginación (20 por página para mejorar performance)
         page_number = self.request.GET.get('page')
-        paginator = Paginator(estudiantes_qs, 20)
+        paginator = Paginator(estudiantes_qs, 10)
         estudiantes_page = paginator.get_page(page_number)
         
         context['estudiantes'] = estudiantes_page

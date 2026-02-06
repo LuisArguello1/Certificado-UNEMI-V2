@@ -80,8 +80,12 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
     certs_map = {c.id: c for c in certificados}
     temp_docx_map = {} # {cert_id: path_docx}
     temp_pdf_map = {}  # {cert_id: path_pdf}
+    temp_template_paths = set()  # Plantillas temporales descargadas de Azure
     docx_paths_list = []
     final_errors = []
+    
+    # Mapa de plantillas por evento (para evitar descargas repetidas)
+    evento_template_map = {}  # {evento_id: template_path}
     
     try:
         # Puesto que vamos a procesar, marcamos todos como generating
@@ -94,7 +98,17 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
         
         for cert in certificados:
             try:
-                template_path = get_template_path(cert.evento)
+                evento_id = cert.evento.id
+                
+                # Descargar plantilla solo si no la tenemos ya para este evento
+                if evento_id not in evento_template_map:
+                    template_path = get_template_path(cert.evento)
+                    evento_template_map[evento_id] = template_path
+                    temp_template_paths.add(template_path)
+                else:
+                    template_path = evento_template_map[evento_id]
+                    logger.debug(f"Reutilizando plantilla para evento {evento_id}")
+                
                 variables = TemplateService.get_variables_from_evento_estudiante(
                     cert.evento, cert.estudiante
                 )
@@ -147,11 +161,12 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
                 if cert.evento.incluir_qr:
                     QRService.stamp_qr_on_pdf(pdf_path, cert.uuid_validacion)
                 
-                # Guardado final
+                # Guardado final (ahora sube a Azure automáticamente)
                 final_path = CertificateStorageService.save_pdf_only(
                     evento_id=cert.evento.id,
                     estudiante_id=cert.estudiante.id,
-                    pdf_source_path=pdf_path
+                    pdf_source_path=pdf_path,
+                    nombres_estudiante=cert.estudiante.nombres_completos
                 )
                 
                 # Éxito
@@ -180,9 +195,16 @@ def generate_certificate_batch_task(self, certificado_ids: List[int]) -> Dict[st
         raise self.retry(exc=exc, countdown=60)
 
     finally:
-        # Limpieza masiva
+        # Limpieza masiva de archivos temporales
+        # 1. (OPTIMIZACIÓN) NO BORRAR PLANTILLAS - Se reutilizan desde caché
+        # for template_path in temp_template_paths:
+        #     _safe_remove(template_path)
+        
+        # 2. DOCXs generados
         for path in docx_paths_list:
             _safe_remove(path)
+        
+        # 3. PDFs convertidos
         for path in temp_pdf_map.values():
             _safe_remove(path)
 

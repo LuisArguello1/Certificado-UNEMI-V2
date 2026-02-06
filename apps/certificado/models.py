@@ -673,40 +673,34 @@ class Certificado(models.Model):
 
     def delete(self, *args, **kwargs):
         """
-        Elimina el registro y los archivos físicos asociados (PDF/DOCX).
+        Elimina el registro y los archivos asociados del storage (local o Azure).
         Override seguro para mantener limpio el almacenamiento.
         """
-        # Rutas a eliminar
-        paths_to_remove = []
-        try:
-            if self.archivo_pdf:
-                paths_to_remove.append(self.archivo_pdf.path)
-            if self.archivo_docx:
-                paths_to_remove.append(self.archivo_docx.path)
-        except Exception:
-            pass # Si falla obtener path (ej: storage S3), ignorar
-
+        from django.core.files.storage import default_storage
+        
+        # Guardar nombres de archivos antes de eliminar el registro
+        files_to_delete = []
+        
+        if self.archivo_pdf:
+            files_to_delete.append(self.archivo_pdf.name)
+        
+        if self.archivo_docx:
+            files_to_delete.append(self.archivo_docx.name)
+        
         # Eliminar registro DB primero (si falla, no borramos archivos)
         super().delete(*args, **kwargs)
-
-        # Eliminar archivos físicos y limpiar directorios
-        dirs_to_clean = set()
-        for path in paths_to_remove:
+        
+        # Eliminar archivos del storage (funciona con local y Azure)
+        for file_name in files_to_delete:
             try:
-                if os.path.exists(path):
-                    os.remove(path)
-                    # Añadir directorio padre a la lista de limpieza
-                    dirs_to_clean.add(os.path.dirname(path))
+                if default_storage.exists(file_name):
+                    default_storage.delete(file_name)
             except Exception as e:
                 # Log error pero no romper flujo
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error eliminando archivo {file_name}: {e}")
                 pass
-        
-        # Intentar eliminar directorios vacíos (ej: carpeta del estudiante)
-        for dirty_dir in dirs_to_clean:
-            try:
-                os.rmdir(dirty_dir) # Solo elimina si está vacío
-            except OSError:
-                pass # No está vacío o error de permisos
 
     def __str__(self):
         return f"Certificado de {self.estudiante.nombres_completos} - {self.get_estado_display()}"
