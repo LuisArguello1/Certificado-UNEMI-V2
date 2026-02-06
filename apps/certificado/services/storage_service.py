@@ -11,6 +11,7 @@ import logging
 import tempfile
 from typing import Tuple, Optional
 from django.conf import settings
+from .google_drive_service import GoogleDriveService
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,49 @@ class CertificateStorageService:
             pdf_rel = os.path.relpath(pdf_dest, media_root)
             
             # Normalizar a slash para BD (Django convention)
-            return (docx_rel.replace('\\', '/'), pdf_rel.replace('\\', '/'))
+            docx_rel = os.path.relpath(docx_dest, media_root).replace('\\', '/')
+            pdf_rel = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
+
+            # -------------------------------------------------------------
+            # INTEGRACIÓN GOOGLE DRIVE
+            # -------------------------------------------------------------
+            if getattr(settings, 'GOOGLE_DRIVE_ENABLED', False):
+                try:
+                    drive_service = GoogleDriveService()
+                    root_folder_id = getattr(settings, 'GOOGLE_DRIVE_FOLDER_ID', None)
+                    
+                    # 1. Estructura de carpetas: Root -> Evento -> Estudiante
+                    evento_folder_id = drive_service.get_or_create_folder(str(evento_id), parent_id=root_folder_id)
+                    estudiante_folder_id = drive_service.get_or_create_folder(str(estudiante_id), parent_id=evento_folder_id)
+                    
+                    # 2. Subir PDF (Prioridad)
+                    drive_service.upload_file(
+                        file_path=pdf_dest,
+                        file_name='certificado.pdf',
+                        mime_type='application/pdf',
+                        folder_id=estudiante_folder_id
+                    )
+                    
+                    # 3. Subir DOCX (Opcional, pero recomendado si ya se generó)
+                    if os.path.exists(docx_dest):
+                        drive_service.upload_file(
+                            file_path=docx_dest,
+                            file_name='certificado.docx',
+                            mime_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            folder_id=estudiante_folder_id
+                        )
+                        
+                    logger.info(f"Archivos subidos a Drive para evento {evento_id}, estudiante {estudiante_id}")
+                    
+                    # NOTA: Si GOOGLE_DRIVE_STORAGE_ONLY es True, deberíamos borrar los locales.
+                    # Sin embargo, el servicio de emails (EmailService) depende de los archivos locales actualmente.
+                    # Por seguridad, mantenemos la copia local temporalmente.
+                    
+                except Exception as e:
+                    # No interrumpir el flujo principal si falla Drive (Backup strategy)
+                    logger.error(f"Error subiendo a Google Drive (Backup): {e}")
+
+            return (docx_rel, pdf_rel)
             
         except Exception as e:
             logger.error(f"Error guardando certificados para est {estudiante_id}: {e}")
@@ -143,9 +186,33 @@ class CertificateStorageService:
             shutil.copy2(pdf_source_path, pdf_dest)
             
             media_root = str(settings.MEDIA_ROOT)
-            pdf_rel = os.path.relpath(pdf_dest, media_root)
+            pdf_rel = os.path.relpath(pdf_dest, media_root).replace('\\', '/')
             
-            return pdf_rel.replace('\\', '/')
+            # -------------------------------------------------------------
+            # INTEGRACIÓN GOOGLE DRIVE (Solo PDF)
+            # -------------------------------------------------------------
+            if getattr(settings, 'GOOGLE_DRIVE_ENABLED', False):
+                try:
+                    drive_service = GoogleDriveService()
+                    root_folder_id = getattr(settings, 'GOOGLE_DRIVE_FOLDER_ID', None)
+                    
+                    # Estructura de carpetas
+                    evento_folder_id = drive_service.get_or_create_folder(str(evento_id), parent_id=root_folder_id)
+                    estudiante_folder_id = drive_service.get_or_create_folder(str(estudiante_id), parent_id=evento_folder_id)
+                    
+                    # Subir PDF
+                    drive_service.upload_file(
+                        file_path=pdf_dest,
+                        file_name='certificado.pdf',
+                        mime_type='application/pdf',
+                        folder_id=estudiante_folder_id
+                    )
+                    logger.info(f"PDF regenerado subido a Drive. Evento {evento_id}, est {estudiante_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error subiendo PDF regenerado a Drive: {e}")
+
+            return pdf_rel
             
         except Exception as e:
             logger.error(f"Error guardando PDF para est {estudiante_id}: {e}")

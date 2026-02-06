@@ -30,6 +30,8 @@ media/
 media_fallback/
 
 # Virtual Environment
+credentials/
+*.json
 .env
 venv/
 .venv/

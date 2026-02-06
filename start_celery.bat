@@ -9,8 +9,8 @@ call venv\Scripts\activate
 
 echo Entorno virtual activado.
 echo.
-echo Verificando que Redis esté corriendo...
-echo (Asegúrate de haber ejecutado start_redis.bat primero)
+echo Verificando que Redis este corriendo...
+echo (Asegurate de haber ejecutado start_redis.bat primero)
 echo.
 
 REM Iniciar Celery worker con configuración para Windows
